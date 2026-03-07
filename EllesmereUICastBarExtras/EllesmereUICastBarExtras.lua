@@ -1,5 +1,10 @@
 -------------------------------------------------------------------------------
 --  EllesmereUICastBarExtras.lua
+--
+--  IMPORTANT: Spark and SafeZone are NOT registered as oUF sub-widgets
+--  (castbar.Spark / castbar.SafeZone).  They are managed entirely by our
+--  PostCastStart / PostCastStop hooks to avoid any interaction with oUF's
+--  CastStart processing, which could prevent the castbar from showing.
 -------------------------------------------------------------------------------
 local ADDON_NAME, ns = ...
 
@@ -85,7 +90,7 @@ local function GetProfile()
 end
 
 -------------------------------------------------------------------------------
---  1. Spark
+--  1. Spark  (texture only — NOT assigned to castbar.Spark)
 -------------------------------------------------------------------------------
 local function AddSpark(castbar)
     if castbar._ecbe_spark then return end
@@ -104,11 +109,11 @@ local function AddSpark(castbar)
     spark:Hide()
 
     castbar._ecbe_spark = spark
-    castbar.Spark = spark
+    -- NOTE: do NOT set castbar.Spark — oUF must not manage this
 end
 
 -------------------------------------------------------------------------------
---  2. SafeZone / Latency
+--  2. SafeZone / Latency  (texture only — NOT assigned to castbar.SafeZone)
 -------------------------------------------------------------------------------
 local function AddSafeZone(castbar)
     if castbar._ecbe_safeZone then return end
@@ -120,7 +125,58 @@ local function AddSafeZone(castbar)
     sz:Hide()
 
     castbar._ecbe_safeZone = sz
-    castbar.SafeZone = sz
+    -- NOTE: do NOT set castbar.SafeZone — oUF must not manage this
+end
+
+--- Position and show the SafeZone texture for a player cast/channel.
+local function ShowSafeZone(castbar)
+    local sz = castbar._ecbe_safeZone
+    if not sz then return end
+
+    local isChannel = castbar.channeling
+    local startTime, endTime
+
+    if isChannel then
+        local _, _, _, st, et = UnitChannelInfo("player")
+        startTime, endTime = st, et
+    else
+        local _, _, _, st, et = UnitCastingInfo("player")
+        startTime, endTime = st, et
+    end
+
+    if not startTime or not endTime or endTime == startTime then
+        sz:Hide()
+        return
+    end
+
+    local latency = select(4, GetNetStats()) or 0  -- world latency in ms
+    local duration = endTime - startTime            -- cast duration in ms
+    local ratio = latency / duration
+    if ratio > 1 then ratio = 1 end
+
+    local barWidth = castbar:GetWidth()
+    if barWidth <= 0 then
+        sz:Hide()
+        return
+    end
+
+    sz:ClearAllPoints()
+    sz:SetPoint("TOP")
+    sz:SetPoint("BOTTOM")
+
+    if isChannel then
+        sz:SetPoint("LEFT")
+    else
+        sz:SetPoint("RIGHT")
+    end
+
+    sz:SetWidth(barWidth * ratio)
+    sz:Show()
+end
+
+local function HideSafeZone(castbar)
+    local sz = castbar._ecbe_safeZone
+    if sz then sz:Hide() end
 end
 
 -------------------------------------------------------------------------------
@@ -221,55 +277,91 @@ local function SetupPipStyling(castbar)
 end
 
 -------------------------------------------------------------------------------
---  Hook PostCastStart / PostCastStop chains for tick marks
+--  Hook PostCastStart / PostCastStop chains
+--  Manages: Spark, SafeZone (player only), Channel Ticks (player only)
 -------------------------------------------------------------------------------
-local function HookTickCallbacks(castbar, unit)
-    if castbar._ecbe_ticksHooked then return end
+local function HookCastCallbacks(castbar, unit)
+    if castbar._ecbe_castHooked then return end
 
-    if unit ~= "player" then
-        castbar._ecbe_ticksHooked = true
-        return
-    end
-
-    local origPostCastStart = castbar.PostCastStart
-    local origPostCastStop = castbar.PostCastStop
+    local origPostCastStart   = castbar.PostCastStart
+    local origPostCastStop    = castbar.PostCastStop
     local origPostChannelStop = castbar.PostChannelStop
-    local origPostCastFail = castbar.PostCastFail
+    local origPostCastFail    = castbar.PostCastFail
 
+    local isPlayer = (unit == "player")
+
+    ---------- PostCastStart / PostChannelStart ----------------------------
     castbar.PostCastStart = function(self, u)
         local p = GetProfile()
+        local enabled = p and p.enabled
 
-        if p and p.enabled and p.channelTicks and self.channeling and self.spellID then
-            local ticks = CHANNEL_TICKS[self.spellID]
-            if ticks then
-                SetTicks(self, ticks)
+        -- Spark: show during cast
+        if self._ecbe_spark then
+            if enabled and p.spark then
+                self._ecbe_spark:Show()
+            else
+                self._ecbe_spark:Hide()
+            end
+        end
+
+        -- SafeZone: show for player casts (positioned by us, not oUF)
+        if isPlayer and self._ecbe_safeZone then
+            if enabled and p.safeZone then
+                ShowSafeZone(self)
+            else
+                HideSafeZone(self)
+            end
+        end
+
+        -- Channel ticks: player only
+        if isPlayer then
+            if enabled and p.channelTicks and self.channeling and self.spellID then
+                local ticks = CHANNEL_TICKS[self.spellID]
+                if ticks then
+                    SetTicks(self, ticks)
+                else
+                    HideTicks(self)
+                end
             else
                 HideTicks(self)
             end
-        else
-            HideTicks(self)
         end
 
         if origPostCastStart then origPostCastStart(self, u) end
     end
     castbar.PostChannelStart = castbar.PostCastStart
 
+    ---------- PostCastStop ------------------------------------------------
     castbar.PostCastStop = function(self, u, ...)
-        HideTicks(self)
+        if self._ecbe_spark then self._ecbe_spark:Hide() end
+        if isPlayer then
+            HideSafeZone(self)
+            HideTicks(self)
+        end
         if origPostCastStop then origPostCastStop(self, u, ...) end
     end
 
+    ---------- PostChannelStop ---------------------------------------------
     castbar.PostChannelStop = function(self, u, ...)
-        HideTicks(self)
+        if self._ecbe_spark then self._ecbe_spark:Hide() end
+        if isPlayer then
+            HideSafeZone(self)
+            HideTicks(self)
+        end
         if origPostChannelStop then origPostChannelStop(self, u, ...) end
     end
 
+    ---------- PostCastFail ------------------------------------------------
     castbar.PostCastFail = function(self, u, ...)
-        HideTicks(self)
+        if self._ecbe_spark then self._ecbe_spark:Hide() end
+        if isPlayer then
+            HideSafeZone(self)
+            HideTicks(self)
+        end
         if origPostCastFail then origPostCastFail(self, u, ...) end
     end
 
-    castbar._ecbe_ticksHooked = true
+    castbar._ecbe_castHooked = true
 end
 
 -------------------------------------------------------------------------------
@@ -280,45 +372,45 @@ local function ApplyFeatures()
     if not p then return end
 
     for _, castbar in ipairs(enhancedCastbars) do
-        if castbar and castbar._ecbe_spark then
-            if p.enabled and p.spark then
-                castbar.Spark = castbar._ecbe_spark
-            else
-                castbar.Spark = nil
+        if not castbar then break end
+
+        -- Spark: just hide/show the texture; hook handles cast-time visibility
+        if castbar._ecbe_spark then
+            if not (p.enabled and p.spark) then
                 castbar._ecbe_spark:Hide()
             end
+            -- If enabled, the PostCastStart hook will Show it on next cast
         end
 
-        if castbar and castbar._ecbe_safeZone then
-            if p.enabled and p.safeZone then
-                castbar.SafeZone = castbar._ecbe_safeZone
-            else
-                castbar.SafeZone = nil
+        -- SafeZone: just hide; hook handles cast-time visibility
+        if castbar._ecbe_safeZone then
+            if not (p.enabled and p.safeZone) then
                 castbar._ecbe_safeZone:Hide()
             end
         end
 
-        if castbar then
-            if p.enabled and p.smoothing and Enum and Enum.StatusBarInterpolation then
-                castbar.smoothing = Enum.StatusBarInterpolation.ExponentialEaseOut
-            else
-                castbar.smoothing = nil
-            end
+        -- Smoothing
+        if p.enabled and p.smoothing and Enum and Enum.StatusBarInterpolation then
+            castbar.smoothing = Enum.StatusBarInterpolation.ExponentialEaseOut
+        else
+            castbar.smoothing = nil
+        end
 
-            if p.enabled and p.channelTicks and castbar.channeling and castbar.spellID then
-                local ticks = CHANNEL_TICKS[castbar.spellID]
-                if ticks then
-                    SetTicks(castbar, ticks)
-                else
-                    HideTicks(castbar)
-                end
+        -- Channel ticks: update if currently channeling
+        if p.enabled and p.channelTicks and castbar.channeling and castbar.spellID then
+            local ticks = CHANNEL_TICKS[castbar.spellID]
+            if ticks then
+                SetTicks(castbar, ticks)
             else
                 HideTicks(castbar)
             end
+        else
+            HideTicks(castbar)
+        end
 
-            if castbar.PostUpdatePips then
-                castbar:PostUpdatePips(castbar.NumStages or castbar.numStages)
-            end
+        -- Empowered pips
+        if castbar.PostUpdatePips then
+            castbar:PostUpdatePips(castbar.NumStages or castbar.numStages)
         end
     end
 end
@@ -341,7 +433,7 @@ local function EnhanceCastbars()
                 end
 
                 SetupPipStyling(castbar)
-                HookTickCallbacks(castbar, info.unit)
+                HookCastCallbacks(castbar, info.unit)
 
                 castbar._ecbe_enhanced = true
                 table.insert(enhancedCastbars, castbar)
