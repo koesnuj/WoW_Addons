@@ -1,6 +1,6 @@
 # EllsmereUI
 
-EllesmereUI 애드온 모음 (WoW Retail 12.0)
+EllesmereUI에서 개인적으로 불편한거/찐빠난거 업데이트
 
 ## 포함 애드온
 
