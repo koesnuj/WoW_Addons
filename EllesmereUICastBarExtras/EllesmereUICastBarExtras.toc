@@ -4,6 +4,9 @@
 ## Author: Ayije
 ## Version: 1.0.0
 ## Dependencies: EllesmereUI, EllesmereUIUnitFrames
+## OptionalDeps: EllesmereUIUnitFrames
+## SavedVariables: EllesmereUICastBarExtrasDB
 ## DefaultState: enabled
 
 EllesmereUICastBarExtras.lua
+EUI_CastBarExtras_Options.lua
