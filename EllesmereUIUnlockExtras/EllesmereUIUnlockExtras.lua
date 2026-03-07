@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 --  EllesmereUIUnlockExtras.lua
---  Registers Vehicle Leave, Queue Status, Loot Frame, and Loot Roll as
---  movable elements in EllesmereUI's Unlock Mode via RegisterUnlockElements().
+--  Registers Vehicle Leave, Queue Status, Loot Frame, Loot Roll, and Player
+--  Castbar as movable elements in EllesmereUI's Unlock Mode via
 --
 --  Uses EllesmereUI.Lite profile system — positions are per-profile and
 --  automatically shared/switched when the EllesmereUI profile changes.
@@ -21,6 +21,7 @@ local defaults = {
         queueStatus  = { enabled = true },
         lootFrame    = { enabled = true },
         lootRoll     = { enabled = true },
+        playerCastbar = { enabled = true },
     },
 }
 
@@ -376,6 +377,94 @@ local function GetLootRollElement()
 end
 
 -------------------------------------------------------------------------------
+--  5. Player Castbar (Detached)
+--
+--  EllesmereUIUnitFrames creates the player castbar as part of the oUF frame.
+--  We detach it by re-anchoring the castbar background frame (castbarBg)
+--  to our movable holder.  The StatusBar and icon are children of castbarBg
+--  so they follow automatically.
+--
+--  Requires: EllesmereUIUnitFrames (oUF-based player frame)
+--  Timing: Must run AFTER oUF frames are fully created (delayed init)
+-------------------------------------------------------------------------------
+local castbarHolder
+local castbarBgRef  -- reference to castbar's parent (the background Frame)
+
+local function SetupPlayerCastbar()
+    local playerFrame = _G["EllesmereUIUnitFrames_Player"]
+    if not playerFrame or not playerFrame.Castbar then return false end
+
+    local castbar = playerFrame.Castbar
+    local cbBg = castbar:GetParent()
+    if not cbBg then return false end
+
+    castbarBgRef = cbBg
+
+    -- Read current dimensions from the castbar background
+    local w, h = cbBg:GetSize()
+    if not w or w < 1 then w = 200 end
+    if not h or h < 1 then h = 14 end
+
+    -- Create holder (sized to match castbarBg; icon extends to the left naturally)
+    castbarHolder = CreateFrame("Frame", "EllesmereUIUnlockExtras_PlayerCastbarHolder", UIParent)
+    castbarHolder:SetSize(w, h)
+    castbarHolder:SetPoint("CENTER", UIParent, "CENTER", 0, -200)
+
+    -- Apply any saved position
+    ApplyPositionToHolder("PlayerCastbar", castbarHolder)
+
+    -- Detach: re-anchor castbarBg from the unit frame to our holder
+    cbBg:ClearAllPoints()
+    cbBg:SetPoint("TOPLEFT", castbarHolder, "TOPLEFT", 0, 0)
+
+    -- Guard against EllesmereUIUnitFrames re-anchoring (e.g. settings update)
+    hooksecurefunc(cbBg, "SetPoint", function(self, _, parent)
+        if parent ~= castbarHolder and castbarHolder then
+            self:ClearAllPoints()
+            self:SetPoint("TOPLEFT", castbarHolder, "TOPLEFT", 0, 0)
+        end
+    end)
+
+    return true
+end
+
+local function GetPlayerCastbarElement()
+    return {
+        key   = "PlayerCastbar",
+        label = "Player Castbar",
+        order = 204,
+        getFrame = function()
+            return castbarHolder
+        end,
+        getSize = function()
+            if castbarBgRef then
+                local w, h = castbarBgRef:GetSize()
+                if w and w > 1 then return w, h, 0 end
+            end
+            return 200, 14, 0
+        end,
+        savePosition  = function(key, point, relPoint, x, y, scale)
+            SavePosition(key, point, relPoint, x, y, scale)
+        end,
+        loadPosition  = function(key) return LoadPosition(key) end,
+        clearPosition = function(key) ClearPosition(key) end,
+        applyPosition = function(key)
+            ApplyPositionToHolder(key, castbarHolder)
+            -- Re-anchor castbarBg to holder
+            if castbarBgRef and castbarHolder then
+                pcall(function()
+                    castbarBgRef:ClearAllPoints()
+                    castbarBgRef:SetPoint("TOPLEFT", castbarHolder, "TOPLEFT", 0, 0)
+                end)
+            end
+        end,
+        isHidden = function()
+            return not castbarHolder
+        end,
+    }
+end
+
+-------------------------------------------------------------------------------
 --  Registration
 -------------------------------------------------------------------------------
 local function RegisterAllElements()
@@ -400,6 +489,10 @@ local function RegisterAllElements()
 
     if p.lootRoll.enabled and lootRollHolder then
         elements[#elements + 1] = GetLootRollElement()
+    end
+
+    if p.playerCastbar.enabled and castbarHolder then
+        elements[#elements + 1] = GetPlayerCastbarElement()
     end
 
     if #elements > 0 then
@@ -446,6 +539,16 @@ local function ApplyAllPositions()
             end)
         end
     end
+
+    if castbarHolder then
+        ApplyPositionToHolder("PlayerCastbar", castbarHolder)
+        if castbarBgRef then
+            pcall(function()
+                castbarBgRef:ClearAllPoints()
+                castbarBgRef:SetPoint("TOPLEFT", castbarHolder, "TOPLEFT", 0, 0)
+            end)
+        end
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -467,6 +570,16 @@ function EUE:OnEnable()
     if p.queueStatus.enabled  then SetupQueueStatus()  end
     if p.lootFrame.enabled    then SetupLootFrame()     end
     if p.lootRoll.enabled     then SetupLootRoll()      end
+
+    -- Player castbar: delayed — oUF frames must be fully created first.
+    -- 1.5s to allow EllesmereUICastBarExtras (1.0s) to hook first.
+    if p.playerCastbar.enabled then
+        C_Timer.After(1.5, function()
+            if SetupPlayerCastbar() then
+                RegisterAllElements()
+            end
+        end)
+    end
 
     -- Register with EllesmereUI's unlock system after a short delay
     -- to ensure EllesmereUI is fully loaded.

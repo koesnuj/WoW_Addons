@@ -1,10 +1,10 @@
 ## Interface: 120000, 120001
 ## Title: |cff0cd29fEllesmereUI|r Unlock Extras
-## Notes: Vehicle Leave, Queue Status, Loot Frame, and Loot Roll movers for EllesmereUI Unlock Mode
+## Notes: Vehicle Leave, Queue Status, Loot Frame, Loot Roll, and Player Castbar movers for EllesmereUI Unlock Mode
 ## Author: Ayije
 ## Version: 1.0.0
 ## Dependencies: EllesmereUI
-## OptionalDeps: EllesmereUIActionBars
+## OptionalDeps: EllesmereUIActionBars, EllesmereUIUnitFrames
 ## SavedVariables: EllesmereUIUnlockExtrasDB
 ## DefaultState: enabled
 
