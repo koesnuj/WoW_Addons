@@ -149,6 +149,13 @@ end
 -- This prevents duplicate cast bars from appearing.
 
 function PCB:UpdateBlizzardCastBars()
+    -- Throttle: avoid redundant suppress/restore churn on rapid events
+    local now = GetTime()
+    if self._lastBlizzUpdate and (now - self._lastBlizzUpdate) < 0.25 then
+        return
+    end
+    self._lastBlizzUpdate = now
+
     local db = self.db
 
     -- PLAYER: suppress/restore based on whether PCB player bar is enabled

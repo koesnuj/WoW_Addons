@@ -805,8 +805,8 @@ local function ConfigureStatusBarForState(f)
     local dur = nil
 
     if st.startSec and st.endSec then
-        local ok, d = pcall(function() return st.endSec - st.startSec end)
-        if ok and type(d) == "number" and d > 0 then
+        local d = st.endSec - st.startSec
+        if type(d) == "number" and d > 0 then
             dur = d
         end
     end
@@ -816,16 +816,16 @@ local function ConfigureStatusBarForState(f)
         if st.kind == "channel" then
             local name, _, _, startMS, endMS = UnitChannelInfo(unit)
             if name and startMS and endMS then
-                local ok, d = pcall(function() return (endMS - startMS) / 1000 end)
-                if ok and type(d) == "number" and d > 0 then
+                local d = (endMS - startMS) / 1000
+                if type(d) == "number" and d > 0 then
                     dur = d
                 end
             end
         else
             local name, _, _, startMS, endMS = UnitCastingInfo(unit)
             if name and startMS and endMS then
-                local ok, d = pcall(function() return (endMS - startMS) / 1000 end)
-                if ok and type(d) == "number" and d > 0 then
+                local d = (endMS - startMS) / 1000
+                if type(d) == "number" and d > 0 then
                     dur = d
                 end
             end
@@ -883,7 +883,7 @@ local function StartOrRefreshFromUnit(f, unitHint)
     f._stopCheckAt = nil
     f._stopUnit = nil
 
-    ApplyAppearance(f)
+    if not f._state then ApplyAppearance(f) end
     ApplyCastBarColor(f)
     SetIcon(f, texture)
 
@@ -918,8 +918,8 @@ local function StartOrRefreshFromUnit(f, unitHint)
         local name, _, _, startMS, endMS = UnitChannelInfo(st.unit)
         if name and startMS and endMS then
             local nowMs = GetTime() * 1000
-            local ok, apiElapsed = pcall(function() return (nowMs - startMS) / 1000 end)
-            if ok and apiElapsed > 0 and apiElapsed < st.durationSec then
+            local apiElapsed = (nowMs - startMS) / 1000
+            if apiElapsed > 0 and apiElapsed < st.durationSec then
                 initialElapsed = apiElapsed
             end
         end
@@ -1014,7 +1014,13 @@ FrameOnUpdate = function(f, elapsed)
             end
         end
 
-        StopIfReallyStopped(f, st.unit)
+        do
+            local pollUnit = GetEffectiveUnit(f, st.unit)
+            if not ShouldStillBeCasting(pollUnit) and not f._endGraceUntil then
+                f._endGraceUntil = SafeNow() + END_GRACE_SECONDS * 3
+            end
+            StopIfReallyStopped(f, pollUnit)
+        end
     end
 
     local remaining, elapsedSec
@@ -1023,12 +1029,12 @@ FrameOnUpdate = function(f, elapsed)
         local apiRemaining, apiElapsed, apiValid = nil, nil, false
 
         if st.startSec and st.endSec then
-            local okR, r = pcall(function() return st.endSec - now end)
-            local okE, e = pcall(function() return now - st.startSec end)
-            if okR and type(r) == "number" and r >= -1 and r <= (st.durationSec or 999) then
+            local r = st.endSec - now
+            local e = now - st.startSec
+            if type(r) == "number" and r >= -1 and r <= (st.durationSec or 999) then
                 apiRemaining = r
             end
-            if okE and type(e) == "number" and e >= -1 and e <= (st.durationSec or 999) then
+            if type(e) == "number" and e >= -1 and e <= (st.durationSec or 999) then
                 apiElapsed = e
             end
             if apiRemaining and apiElapsed and apiRemaining >= 0 and apiElapsed >= 0 then
@@ -1078,16 +1084,16 @@ FrameOnUpdate = function(f, elapsed)
         end
 
         if (type(remaining) ~= "number" or type(elapsedSec) ~= "number") and st.startSec and st.endSec then
-            local okR, r = pcall(function() return st.endSec - now end)
-            local okE, e = pcall(function() return now - st.startSec end)
-            remaining = (okR and type(r) == "number") and r or remaining
-            elapsedSec = (okE and type(e) == "number") and e or elapsedSec
+            local r = st.endSec - now
+            local e = now - st.startSec
+            remaining = type(r) == "number" and r or remaining
+            elapsedSec = type(e) == "number" and e or elapsedSec
         end
     elseif st.startSec and st.endSec then
-        local okR, r = pcall(function() return st.endSec - now end)
-        local okE, e = pcall(function() return now - st.startSec end)
-        remaining = (okR and type(r) == "number") and r or nil
-        elapsedSec = (okE and type(e) == "number") and e or nil
+        local r = st.endSec - now
+        local e = now - st.startSec
+        remaining = type(r) == "number" and r or nil
+        elapsedSec = type(e) == "number" and e or nil
     end
 
     local hasRemaining = type(remaining) == "number"
@@ -1183,12 +1189,7 @@ FrameOnUpdate = function(f, elapsed)
         if f.timeText then
             -- Check showTime setting - default to false if not explicitly enabled
             if bdb.showTime == true then
-                local ok, s = pcall(string.format, "%.1f", remaining)
-                if ok and s then
-                    f.timeText:SetText(s)
-                else
-                    f.timeText:SetText("")
-                end
+                f.timeText:SetText(string.format("%.1f", remaining))
             else
                 f.timeText:SetText("")
             end
