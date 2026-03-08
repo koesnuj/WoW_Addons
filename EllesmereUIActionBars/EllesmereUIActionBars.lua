@@ -2422,6 +2422,87 @@ local function AttachHoverHooks(barKey)
     end
 end
 
+-------------------------------------------------------------------------------
+--  Tooltip System
+--  Reparented buttons lose Blizzard's native OnEnter → SetTooltip() chain.
+--  These hooks re-implement tooltip display for all button types so hovering
+--  correctly shows GameTooltip regardless of parent frame.
+-------------------------------------------------------------------------------
+local function AttachTooltipHooks(barKey)
+    local buttons = barButtons[barKey]
+    if not buttons then return end
+    local info = BAR_LOOKUP[barKey]
+
+    for i = 1, #buttons do
+        local btn = buttons[i]
+        if btn and not btn._eabTooltipHooked then
+            btn:HookScript("OnEnter", function(self)
+                if self:IsForbidden() then return end
+                -- Skip if Blizzard's native handler already set the tooltip
+                if GameTooltip:GetOwner() == self then return end
+
+                if info and info.isPetBar then
+                    -- Pet action button: tooltip data set by PetActionButtonMixin:Update()
+                    if not self.tooltipName then return end
+                    if GetCVar("UberTooltips") == "1" then
+                        GameTooltip_SetDefaultAnchor(GameTooltip, self)
+                    else
+                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    end
+                    if self.isToken then
+                        GameTooltip:SetText(_G[self.tooltipName], 1, 1, 1)
+                    else
+                        GameTooltip:SetText(self.tooltipName, 1, 1, 1)
+                    end
+                    if self.tooltipSubtext then
+                        GameTooltip:AddLine(self.tooltipSubtext, "", 0.5, 0.5, 0.5)
+                    end
+                    GameTooltip:Show()
+                elseif info and info.isStance then
+                    -- Stance button: use shapeshift form index (original button ID)
+                    local id = self:GetID()
+                    if id and id > 0 and GetShapeshiftFormInfo(id) then
+                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                        GameTooltip:SetShapeshift(id)
+                    end
+                else
+                    -- Action button: use action attribute set during SetupBar
+                    local action = self.action or self:GetAttribute("action")
+                    if not action or not HasAction(action) then return end
+                    if GetCVar("UberTooltips") == "1" then
+                        GameTooltip_SetDefaultAnchor(GameTooltip, self)
+                    else
+                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    end
+                    if GameTooltip:SetAction(action) then
+                        self.UpdateTooltip = function(s)
+                            if GameTooltip:GetOwner() ~= s then return end
+                            local act = s.action or s:GetAttribute("action")
+                            if not act or not HasAction(act) then return end
+                            if GetCVar("UberTooltips") == "1" then
+                                GameTooltip_SetDefaultAnchor(GameTooltip, s)
+                            else
+                                GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+                            end
+                            GameTooltip:SetAction(act)
+                        end
+                    else
+                        self.UpdateTooltip = nil
+                    end
+                end
+            end)
+
+            btn:HookScript("OnLeave", function(self)
+                if GameTooltip:GetOwner() == self then
+                    GameTooltip:Hide()
+                end
+            end)
+
+            btn._eabTooltipHooked = true
+        end
+    end
+end
+
 function EAB:RefreshMouseover()
     for _, info in ipairs(ALL_BARS) do
         local key = info.key
@@ -2856,6 +2937,7 @@ local function UpdateFlipbook(btn)
         wrapper:SetAllPoints(btn)
         wrapper:SetFrameLevel(btn:GetFrameLevel() + 1)
         btn._eabGlowWrapper = wrapper
+        wrapper:EnableMouse(false)  -- prevent glow frame from intercepting button mouse events
     end
     local wrapper = btn._eabGlowWrapper
     -- Keep wrapper just above btn base but below shape border overlay
@@ -4155,6 +4237,10 @@ function EAB:FinishSetup()
     -- Attach hover hooks for mouseover
     for _, info in ipairs(BAR_CONFIG) do
         AttachHoverHooks(info.key)
+    end
+    -- Attach tooltip hooks so reparented buttons show GameTooltip on hover
+    for _, info in ipairs(BAR_CONFIG) do
+        AttachTooltipHooks(info.key)
     end
 
     -- When a spell flyout closes, fade out any bars that were kept visible by it
