@@ -390,25 +390,62 @@ end
 local lfgReadyHolder
 
 local function SetupLFGReadyPopup()
-    local popup = _G.LFGDungeonReadyPopup
-    if not popup then return end
-
+    -- Always create the holder (LFGDungeonReadyPopup is load-on-demand and
+    -- may not exist at PLAYER_LOGIN).
     lfgReadyHolder = CreateFrame("Frame", "EllesmereUIUnlockExtras_LFGReadyHolder", UIParent)
     lfgReadyHolder:SetSize(230, 195)
     lfgReadyHolder:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
 
     ApplyPositionToHolder("LFGReadyPopup", lfgReadyHolder)
 
-    -- Reposition after Blizzard's StaticPopupSpecial_Show places the popup
-    popup:HookScript("OnShow", function(self)
-        if InCombatLockdown() or not lfgReadyHolder then return end
-        C_Timer.After(0, function()
-            if InCombatLockdown() or not self:IsShown() then return end
-            pcall(function()
-                self:ClearAllPoints()
-                self:SetPoint("CENTER", lfgReadyHolder, "CENTER")
-            end)
+    local popupHooked = false
+
+    -- Once the popup frame exists, install a SetPoint guard (same pattern as
+    -- Vehicle Leave) so Blizzard can never reposition it away from our holder.
+    local function AnchorPopup(popup)
+        if popupHooked then return end
+        popupHooked = true
+
+        hooksecurefunc(popup, "SetPoint", function(self, _, relativeTo)
+            if relativeTo ~= lfgReadyHolder then
+                pcall(function()
+                    self:ClearAllPoints()
+                    self:SetPoint("CENTER", lfgReadyHolder, "CENTER")
+                end)
+            end
         end)
+
+        -- Anchor once right now if already visible
+        if popup:IsShown() and not InCombatLockdown() then
+            pcall(function()
+                popup:ClearAllPoints()
+                popup:SetPoint("CENTER", lfgReadyHolder, "CENTER")
+            end)
+        end
+    end
+
+    -- Try immediately (works after /reload while LFG addon is already loaded)
+    if _G.LFGDungeonReadyPopup then
+        AnchorPopup(_G.LFGDungeonReadyPopup)
+    end
+
+    -- Primary hook: catch the popup when Blizzard shows it for the first time
+    if StaticPopupSpecial_Show then
+        hooksecurefunc("StaticPopupSpecial_Show", function(frame)
+            if frame == _G.LFGDungeonReadyPopup then
+                AnchorPopup(frame)
+            end
+        end)
+    end
+
+    -- Fallback: watch ADDON_LOADED until the popup frame becomes available
+    local watcher = CreateFrame("Frame")
+    watcher:RegisterEvent("ADDON_LOADED")
+    watcher:SetScript("OnEvent", function(self)
+        if _G.LFGDungeonReadyPopup then
+            AnchorPopup(_G.LFGDungeonReadyPopup)
+            self:UnregisterEvent("ADDON_LOADED")
+        end
     end)
 end
 
