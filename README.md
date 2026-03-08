@@ -15,7 +15,8 @@ Ellesmere UI
 | EllesmereUIUnitFrames | 유닛프레임 커스텀 |
 | EllesmereUIUnlockExtras | Vehicle Leave, Queue Status, Loot Frame, Loot Roll, LFG Ready Popup, Ready Check, Bonus Roll, Alert Toasts 언락 모드 무버 |
 | SocialInfo | 길드원, 친구, 특성, 골드, 내구도 정보를 표시하는 컴팩트 수평 패널 (독립 애드온) |
-| Ayije_CDM | 쿨다운 매니저 (Core + Keybind + Options) |
+| Ayije_CDM | 쿨다운 매니저 (Core + Options) |
+| Ayije_CDM_Keybind | Ayije_CDM 쿨다운 아이콘에 키바인드 텍스트 오버레이 표시 |
 | PhoenixCastBars | 플레이어/타겟/포커스 캐스트바 (secret boolean taint 수정 포함) |
 | QuickTrainer | 트레이너 NPC에서 레시피 구매 후 자동으로 다음 배울 수 있는 레시피 선택 (독립 애드온) |
 
