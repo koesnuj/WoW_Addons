@@ -81,6 +81,7 @@ function ns:CreateRow(key, iconPath, tooltipFunc, clickFunc)
 
     local cell = CreateFrame("Button", nil, panel)
     cell:SetHeight(ICON_SIZE)
+    cell:RegisterForClicks("AnyUp")
 
     -- Icon
     cell.icon = cell:CreateTexture(nil, "ARTWORK")
