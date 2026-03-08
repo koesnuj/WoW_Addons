@@ -1,0 +1,12 @@
+## Interface: 110207
+## Title: QuickLoot
+## Notes: Loot frame replacement with cursor positioning and trainer auto-advance
+## Author: koesnuj
+## Version: 1.0.0
+## SavedVariables: QuickLootDB
+## IconTexture: Interface\Icons\INV_Misc_Bag_10
+
+Core.lua
+Loot.lua
+Trainer.lua
+Config.lua
