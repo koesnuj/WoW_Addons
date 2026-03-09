@@ -118,60 +118,19 @@ initFrame:SetScript("OnEvent", function(self)
     end
 
     ---------------------------------------------------------------------------
-    --  Font dropdown values
-    ---------------------------------------------------------------------------
-    local FONT_DIR = "Interface\\AddOns\\EllesmereUI\\media\\fonts\\"
-    local fontValues = {
-        [FONT_DIR .. "Expressway.TTF"]           = { text = "Expressway",           font = FONT_DIR .. "Expressway.TTF" },
-        [FONT_DIR .. "Avant Garde.ttf"]          = { text = "Avant Garde",          font = FONT_DIR .. "Avant Garde.ttf" },
-        [FONT_DIR .. "Arial Bold.TTF"]           = { text = "Arial Bold",           font = FONT_DIR .. "Arial Bold.TTF" },
-        [FONT_DIR .. "Poppins.ttf"]              = { text = "Poppins",              font = FONT_DIR .. "Poppins.ttf" },
-        [FONT_DIR .. "FiraSans Medium.ttf"]      = { text = "Fira Sans Medium",     font = FONT_DIR .. "FiraSans Medium.ttf" },
-        [FONT_DIR .. "Arial Narrow.ttf"]         = { text = "Arial Narrow",         font = FONT_DIR .. "Arial Narrow.ttf" },
-        [FONT_DIR .. "Changa.ttf"]               = { text = "Changa",               font = FONT_DIR .. "Changa.ttf" },
-        [FONT_DIR .. "Cinzel Decorative.ttf"]    = { text = "Cinzel Decorative",    font = FONT_DIR .. "Cinzel Decorative.ttf" },
-        [FONT_DIR .. "Exo.otf"]                  = { text = "Exo",                  font = FONT_DIR .. "Exo.otf" },
-        [FONT_DIR .. "FiraSans Bold.ttf"]        = { text = "Fira Sans Bold",       font = FONT_DIR .. "FiraSans Bold.ttf" },
-        [FONT_DIR .. "FiraSans Light.ttf"]       = { text = "Fira Sans Light",      font = FONT_DIR .. "FiraSans Light.ttf" },
-        [FONT_DIR .. "Future X Black.otf"]       = { text = "Future X Black",       font = FONT_DIR .. "Future X Black.otf" },
-        [FONT_DIR .. "Gotham Narrow Ultra.otf"]  = { text = "Gotham Narrow Ultra",  font = FONT_DIR .. "Gotham Narrow Ultra.otf" },
-        [FONT_DIR .. "Gotham Narrow.otf"]        = { text = "Gotham Narrow",        font = FONT_DIR .. "Gotham Narrow.otf" },
-        [FONT_DIR .. "Russo One.ttf"]            = { text = "Russo One",            font = FONT_DIR .. "Russo One.ttf" },
-        [FONT_DIR .. "Ubuntu.ttf"]               = { text = "Ubuntu",               font = FONT_DIR .. "Ubuntu.ttf" },
-        [FONT_DIR .. "Homespun.ttf"]             = { text = "Homespun",             font = FONT_DIR .. "Homespun.ttf" },
-        ["Fonts\\FRIZQT__.TTF"]                  = { text = "Friz Quadrata",        font = "Fonts\\FRIZQT__.TTF" },
-        ["Fonts\\ARIALN.TTF"]                    = { text = "Arial",                font = "Fonts\\ARIALN.TTF" },
-        ["Fonts\\MORPHEUS.TTF"]                  = { text = "Morpheus",             font = "Fonts\\MORPHEUS.TTF" },
-        ["Fonts\\skurri.ttf"]                    = { text = "Skurri",               font = "Fonts\\skurri.ttf" },
-    }
-    local fontOrder = {
-        FONT_DIR .. "Expressway.TTF",
-        FONT_DIR .. "Avant Garde.ttf",
-        FONT_DIR .. "Arial Bold.TTF",
-        FONT_DIR .. "Poppins.ttf",
-        FONT_DIR .. "FiraSans Medium.ttf",
-        "---",
-        FONT_DIR .. "Arial Narrow.ttf",
-        FONT_DIR .. "Changa.ttf",
-        FONT_DIR .. "Cinzel Decorative.ttf",
-        FONT_DIR .. "Exo.otf",
-        FONT_DIR .. "FiraSans Bold.ttf",
-        FONT_DIR .. "FiraSans Light.ttf",
-        FONT_DIR .. "Future X Black.otf",
-        FONT_DIR .. "Gotham Narrow Ultra.otf",
-        FONT_DIR .. "Gotham Narrow.otf",
-        FONT_DIR .. "Russo One.ttf",
-        FONT_DIR .. "Ubuntu.ttf",
-        FONT_DIR .. "Homespun.ttf",
-        "Fonts\\FRIZQT__.TTF",
-        "Fonts\\ARIALN.TTF",
-        "Fonts\\MORPHEUS.TTF",
-        "Fonts\\skurri.ttf",
-    }
-
-    ---------------------------------------------------------------------------
     --  Health bar texture dropdown values (built from ns tables)
     ---------------------------------------------------------------------------
+    -- Append SharedMedia textures to the runtime ns tables first so both
+    -- the dropdown AND the live nameplate rendering can resolve SM keys.
+    if EllesmereUI.AppendSharedMediaTextures then
+        EllesmereUI.AppendSharedMediaTextures(
+            ns.healthBarTextureNames or {},
+            ns.healthBarTextureOrder or {},
+            nil,
+            ns.healthBarTextures
+        )
+    end
+
     local hbtValues = {}
     local hbtOrder = {}
     do
@@ -350,7 +309,8 @@ initFrame:SetScript("OnEvent", function(self)
         -- Hash line on preview health bar
         local previewHashLine = health:CreateTexture(nil, "OVERLAY", nil, 3)
         previewHashLine:SetColorTexture(1, 1, 1, 0.8)
-        PP.Width(previewHashLine, 2)
+        UnsnapTex(previewHashLine)
+        previewHashLine:SetWidth(Snap(2))
         previewHashLine:SetPoint("TOP", health, "TOP", 0, 0)
         previewHashLine:SetPoint("BOTTOM", health, "BOTTOM", 0, 0)
         previewHashLine:Hide()
@@ -418,10 +378,10 @@ initFrame:SetScript("OnEvent", function(self)
             if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end
             return t
         end
-        local solidT = MkSolidEdge(); PP.Height(solidT, 1); PP.Point(solidT, "TOPLEFT", healthWrapper, "TOPLEFT", 0, 0); PP.Point(solidT, "TOPRIGHT", healthWrapper, "TOPRIGHT", 0, 0)
-        local solidB = MkSolidEdge(); PP.Height(solidB, 1); PP.Point(solidB, "BOTTOMLEFT", healthWrapper, "BOTTOMLEFT", 0, 0); PP.Point(solidB, "BOTTOMRIGHT", healthWrapper, "BOTTOMRIGHT", 0, 0)
-        local solidL = MkSolidEdge(); PP.Width(solidL, 1); PP.Point(solidL, "TOPLEFT", healthWrapper, "TOPLEFT", 0, 0); PP.Point(solidL, "BOTTOMLEFT", healthWrapper, "BOTTOMLEFT", 0, 0)
-        local solidR = MkSolidEdge(); PP.Width(solidR, 1); PP.Point(solidR, "TOPRIGHT", healthWrapper, "TOPRIGHT", 0, 0); PP.Point(solidR, "BOTTOMRIGHT", healthWrapper, "BOTTOMRIGHT", 0, 0)
+        local solidT = MkSolidEdge(); solidT:SetHeight(1); PP.Point(solidT, "TOPLEFT", healthWrapper, "TOPLEFT", 0, 0); PP.Point(solidT, "TOPRIGHT", healthWrapper, "TOPRIGHT", 0, 0)
+        local solidB = MkSolidEdge(); solidB:SetHeight(1); PP.Point(solidB, "BOTTOMLEFT", healthWrapper, "BOTTOMLEFT", 0, 0); PP.Point(solidB, "BOTTOMRIGHT", healthWrapper, "BOTTOMRIGHT", 0, 0)
+        local solidL = MkSolidEdge(); solidL:SetWidth(1); PP.Point(solidL, "TOPLEFT", healthWrapper, "TOPLEFT", 0, 0); PP.Point(solidL, "BOTTOMLEFT", healthWrapper, "BOTTOMLEFT", 0, 0)
+        local solidR = MkSolidEdge(); solidR:SetWidth(1); PP.Point(solidR, "TOPRIGHT", healthWrapper, "TOPRIGHT", 0, 0); PP.Point(solidR, "BOTTOMRIGHT", healthWrapper, "BOTTOMRIGHT", 0, 0)
         local _solidEdges = { solidT, solidB, solidL, solidR }
 
         -- 9-slice soft glow frame for EllesmereUI target glow preview
@@ -770,6 +730,7 @@ initFrame:SetScript("OnEvent", function(self)
             local curHpVal = math.floor(PV_CONST.FAKE_MAX_HP * curHpPct / 100)
             health:SetValue(curHpVal)
             local pctStr = curHpPct .. "%"
+            local pctNoSignStr = tostring(curHpPct)
             local hpNumStr = tostring(curHpVal):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
             -- Text on hpText/hpNumber is set later by the slot-based positioning logic
             cast:SetValue(_previewCastFill or 0.60)
@@ -943,10 +904,10 @@ initFrame:SetScript("OnEvent", function(self)
             -- Helper: position a health-related element in a bar slot
             local function PlaceHealthInBar(element, anchor, point, xOff, yOff, fontSize, cr, cg, cb)
                 yOff = yOff or 0
-                if element == "healthPercent" then
+                if element == "healthPercent" or element == "healthPercentNoSign" then
                     SetPVFont(hpText, fontPath, fontSize, npOutline)
                     hpText:SetParent(healthTextFrame)
-                    hpText:SetText(pctStr)
+                    hpText:SetText(element == "healthPercentNoSign" and pctNoSignStr or pctStr)
                     hpText:SetPoint(point, health, anchor, xOff, yOff)
                     hpText:SetTextColor(cr, cg, cb, 1)
                     hpText:Show()
@@ -978,9 +939,9 @@ initFrame:SetScript("OnEvent", function(self)
             local function PlaceHealthOnTop(element, txOff, tyOff, fontSize, cr, cg, cb)
                 txOff = txOff or 0
                 tyOff = tyOff or 0
-                if element == "healthPercent" then
+                if element == "healthPercent" or element == "healthPercentNoSign" then
                     SetPVFont(hpText, fontPath, fontSize, npOutline)
-                    hpText:SetText(pctStr)
+                    hpText:SetText(element == "healthPercentNoSign" and pctNoSignStr or pctStr)
                     hpText:SetParent(topTextFrame)
                     hpText:SetPoint("BOTTOM", health, "TOP", txOff, 4 + nameYOff + cpPush + tyOff)
                     hpText:SetTextColor(cr, cg, cb, 1)
@@ -1507,7 +1468,6 @@ initFrame:SetScript("OnEvent", function(self)
                     local scaledH   = Snap(CP.PIP_H * cpScale)
                     local scaledGap = Snap(cpGap * cpScale)
                     local totalPipW = cpMax * scaledW + (cpMax - 1) * scaledGap
-                    local startX    = Snap(-totalPipW / 2 + scaledW / 2)
 
                     -- Determine anchor frame and direction
                     local anchorPoint, anchorRelPoint, anchorFrame, yDir
@@ -1526,13 +1486,25 @@ initFrame:SetScript("OnEvent", function(self)
 
                     local cpEmptyCol = (DB() and DB().classPowerEmptyColor) or defaults.classPowerEmptyColor
 
+                    -- Pre-compute each pip's left-edge X in group-local coords.
+                    -- Position by BOTTOMLEFT/TOPLEFT to avoid half-pixel center offsets.
+                    local pipPositions = {}
+                    for i = 1, cpMax do
+                        pipPositions[i] = Snap((i - 1) * (scaledW + scaledGap))
+                    end
+                    local groupW = pipPositions[cpMax] + scaledW
+                    local halfGroup = Snap(groupW / 2)
+
+                    local leftAnchor = (anchorPoint == "BOTTOM") and "BOTTOMLEFT" or "TOPLEFT"
+
                     for i = 1, CP.MAX_POSSIBLE do
                         local pip = CP.pips[i]
                         if i <= cpMax then
                             pip:ClearAllPoints()
                             pip:SetSize(scaledW, scaledH)
-                            pip:SetPoint(anchorPoint, anchorFrame, anchorRelPoint,
-                                Snap(startX + (i - 1) * (scaledW + scaledGap) + cpXOff), Snap(yDir * cpYOff))
+                            local pipLeftX = Snap(pipPositions[i] - halfGroup + cpXOff)
+                            pip:SetPoint(leftAnchor, anchorFrame, anchorRelPoint,
+                                pipLeftX, Snap(yDir * cpYOff))
 
                             -- Background behind each pip
                             local bg = pip._bg
@@ -2382,13 +2354,14 @@ initFrame:SetScript("OnEvent", function(self)
 
             -- 1px black border
             local function AddIconBorder(p)
+                local onePx = PP.Scale(1)
                 local function mkB(anchor1, rel, anchor2, isH)
                     local t = p:CreateTexture(nil, "OVERLAY", nil, 7)
                     t:SetColorTexture(0, 0, 0, 1)
                     if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end
                     PP.Point(t, anchor1, p, anchor1, 0, 0)
                     PP.Point(t, anchor2, p, anchor2, 0, 0)
-                    if isH then PP.Height(t, 1) else PP.Width(t, 1) end
+                    if isH then t:SetHeight(onePx) else t:SetWidth(onePx) end
                     return t
                 end
                 local tEdge = mkB("TOPLEFT", p, "TOPRIGHT", true)
@@ -2398,13 +2371,13 @@ initFrame:SetScript("OnEvent", function(self)
                 if lEdge.SetSnapToPixelGrid then lEdge:SetSnapToPixelGrid(false); lEdge:SetTexelSnappingBias(0) end
                 PP.Point(lEdge, "TOPLEFT", tEdge, "BOTTOMLEFT", 0, 0)
                 PP.Point(lEdge, "BOTTOMLEFT", bEdge, "TOPLEFT", 0, 0)
-                PP.Width(lEdge, 1)
+                lEdge:SetWidth(onePx)
                 local rEdge = p:CreateTexture(nil, "OVERLAY", nil, 7)
                 rEdge:SetColorTexture(0, 0, 0, 1)
                 if rEdge.SetSnapToPixelGrid then rEdge:SetSnapToPixelGrid(false); rEdge:SetTexelSnappingBias(0) end
                 PP.Point(rEdge, "TOPRIGHT", tEdge, "BOTTOMRIGHT", 0, 0)
                 PP.Point(rEdge, "BOTTOMRIGHT", bEdge, "TOPRIGHT", 0, 0)
-                PP.Width(rEdge, 1)
+                rEdge:SetWidth(onePx)
             end
             AddIconBorder(iconFrame)
 
@@ -2739,286 +2712,24 @@ initFrame:SetScript("OnEvent", function(self)
     end
 
     ---------------------------------------------------------------------------
-    --  Preset system now lives in EllesmereUI.lua (EllesmereUI:BuildPresetSystem)
-    --  Callers pass dbFunc, dbValFunc, and defaults in the cfg table.
-    ---------------------------------------------------------------------------
-
-    ---------------------------------------------------------------------------
     --  Display page  (preview in content header + settings in scroll area)
     ---------------------------------------------------------------------------
     local _updatePreviewHooked = false
-    local onPresetSettingChanged  -- module-scope: always updated by SetContentHeader
-    local _displayPresetCheckDrift  -- stashed reference: survives tab switches
 
     local _refreshAllPlatesHooked = false
-    local onColorPresetSettingChanged  -- module-scope: always updated by Colors SetContentHeader
-    local _colorPresetCheckDrift  -- stashed reference: survives tab switches
 
     local function BuildDisplayPage(pageName, parent, yOffset)
         local W = EllesmereUI.Widgets
         local y = yOffset
         local _, h
 
-        -- Clear color preset hook (only active on Colors page)
-        onColorPresetSettingChanged = nil
-
         local function isBorderNone()
             return (DBVal("borderStyle") or defaults.borderStyle) == "none"
         end
 
-        -- [PRESET SYSTEM DISABLED]
-        --[[ Display preset system: presetKeys, randomize, refresh
-        local displayPresetKeys = {
-            "borderStyle", "borderColor", "targetGlowStyle", "showTargetArrows",
-            "showClassPower", "classPowerPos", "classPowerYOffset", "classPowerScale",
-            "classPowerClassColors", "classPowerGap", "classPowerCustomColor", "classPowerBgColor", "classPowerEmptyColor",
-            "textSlotTop", "textSlotRight", "textSlotLeft", "textSlotCenter",
-            "nameYOffset",
-            "healthBarHeight", "healthBarWidth", "castBarHeight",
-            "castScale", "showCastIcon", "castIconScale",
-            "castNameSize", "castNameColor", "castTargetSize", "castTargetClassColor", "castTargetColor",
-            "debuffSlot", "buffSlot", "ccSlot",
-            "debuffYOffset", "sideAuraXOffset", "auraSpacing",
-            "debuffTimerPosition", "buffTimerPosition", "ccTimerPosition",
-            "auraDurationTextSize", "auraDurationTextColor",
-            "auraStackTextSize", "auraStackTextColor",
-            "buffTextSize", "buffTextColor", "ccTextSize", "ccTextColor",
-            "raidMarkerPos",
-            "classificationSlot",
-            "hashLineEnabled", "hashLinePercent", "hashLineColor",
-            "focusCastHeight",
-            "font",
-            -- Slot-based size + offset keys
-            "topSlotSize", "topSlotXOffset", "topSlotYOffset",
-            "rightSlotSize", "rightSlotXOffset", "rightSlotYOffset",
-            "leftSlotSize", "leftSlotXOffset", "leftSlotYOffset",
-            "toprightSlotSize", "toprightSlotXOffset", "toprightSlotYOffset", "toprightSlotGrowth",
-            "topleftSlotSize", "topleftSlotXOffset", "topleftSlotYOffset", "topleftSlotGrowth",
-            -- Text slot size + offset keys
-            "textSlotTopSize", "textSlotTopXOffset", "textSlotTopYOffset",
-            "textSlotRightSize", "textSlotRightXOffset", "textSlotRightYOffset",
-            "textSlotLeftSize", "textSlotLeftXOffset", "textSlotLeftYOffset",
-            "textSlotCenterSize", "textSlotCenterXOffset", "textSlotCenterYOffset",
-            -- Text slot color keys
-            "textSlotTopColor", "textSlotRightColor", "textSlotLeftColor", "textSlotCenterColor",
-            -- Color keys (merged from Colors tab preset)
-            "focusColorEnabled", "focus", "focusOverlayTexture", "focusOverlayAlpha", "focusOverlayColor",
-            "caster", "miniboss", "enemyInCombat",
-            "castBar", "interruptReady", "castBarUninterruptible",
-            "tankHasAggroEnabled", "tankHasAggro", "tankLosingAggro", "tankNoAggro",
-            "dpsHasAggro", "dpsNearAggro",
-            -- Bar texture overlay keys
-            "healthBarTexture", "healthBarTextureColor",
-            "healthBarTextureClassColor", "healthBarTextureScale", "healthBarTextureFit",
-        }
-
-        local function RandomizeDisplaySettings(db)
-            local borderOptions = { "ellesmere", "simple" }
-            local glowOptions = { "ellesmereui", "vibrant", "none" }
-            local cpPosOptions = { "bottom", "top" }
-            local timerOptions = { "topleft", "center", "topright", "none" }
-            local function rColor() return { r = math.random(), g = math.random(), b = math.random() } end
-            local function pick(t) return t[math.random(#t)] end
-
-            -- Aura slots: exclusive pick from all 5 visible slots, remainder gets "none"
-            local auraSlots = { "top", "left", "right", "topleft", "topright", "bottom" }
-            local function pickAuraSlot()
-                if #auraSlots == 0 then return "none" end
-                local i = math.random(#auraSlots)
-                local s = auraSlots[i]
-                table.remove(auraSlots, i)
-                return s
-            end
-
-            -- Border / glow / arrows
-            db.borderStyle = pick(borderOptions)
-            db.borderColor = rColor()
-            db.targetGlowStyle = pick(glowOptions)
-            db.showTargetArrows = math.random() > 0.5
-
-            -- Class power
-            db.showClassPower = math.random() > 0.5
-            db.classPowerPos = pick(cpPosOptions)
-            db.classPowerYOffset = math.random(0, 6)
-            db.classPowerXOffset = math.random(-10, 10)
-            db.classPowerScale = 0.6 + math.random() * 0.8
-            db.classPowerClassColors = math.random() > 0.5
-            db.classPowerGap = math.random(0, 6)
-
-            -- Text slot positions: exclusive pick from pool
-            local textPool = { "enemyName", "healthPercent", "healthNumber", "healthPctNum", "healthNumPct" }
-            local function pickTextElement()
-                if #textPool == 0 then return "none" end
-                local i = math.random(#textPool)
-                local e = textPool[i]
-                table.remove(textPool, i)
-                return e
-            end
-            db.textSlotTop = pickTextElement()
-            db.textSlotRight = pickTextElement()
-            db.textSlotLeft = pickTextElement()
-            db.textSlotCenter = pickTextElement()
-
-            -- Health / name text (per-slot colors)
-            db.textSlotTopColor = rColor()
-            db.textSlotRightColor = rColor()
-            db.textSlotLeftColor = rColor()
-            db.textSlotCenterColor = rColor()
-            db.nameYOffset = math.random(0, 10)
-
-            -- Bar sizes
-            db.healthBarHeight = math.random(10, 24)
-            db.healthBarWidth = math.random(2, 10)
-            db.castBarHeight = math.random(10, 24)
-
-            -- Cast bar text
-            db.castNameSize = math.random(8, 14)
-            db.castNameColor = rColor()
-            db.castTargetSize = math.random(8, 14)
-            db.castTargetClassColor = (math.random() > 0.5)
-            db.castTargetColor = rColor()
-            db.castScale = math.random(10, 40) * 5  -- 50-200 step 5
-            db.showCastIcon = math.random() > 0.3
-            db.castIconScale = math.floor((0.5 + math.random() * 1.5) * 10 + 0.5) / 10
-
-            -- Aura slots (exclusive)
-            db.debuffSlot = pickAuraSlot()
-            db.buffSlot = pickAuraSlot()
-            db.ccSlot = pickAuraSlot()
-
-            -- Aura offsets / spacing
-            db.debuffYOffset = math.random(0, 8)
-            db.sideAuraXOffset = math.random(0, 8)
-            db.auraSpacing = math.random(0, 6)
-
-            -- Slot-based icon sizes (all 5 slots)
-            db.topSlotSize = math.random(18, 34)
-            db.rightSlotSize = math.random(18, 34)
-            db.leftSlotSize = math.random(18, 34)
-            db.toprightSlotSize = math.random(18, 34)
-            db.topleftSlotSize = math.random(18, 34)
-            -- Slot-based icon offsets (all 0 for randomize)
-            db.topSlotXOffset = 0;      db.topSlotYOffset = 0
-            db.rightSlotXOffset = 0;    db.rightSlotYOffset = 0
-            db.leftSlotXOffset = 0;     db.leftSlotYOffset = 0
-            db.toprightSlotXOffset = 0; db.toprightSlotYOffset = 0
-            db.topleftSlotXOffset = 0;  db.topleftSlotYOffset = 0
-
-            -- Timer positions (unified â€” all set to same value)
-            local timerPos = pick(timerOptions)
-            db.debuffTimerPosition = timerPos
-            db.buffTimerPosition = timerPos
-            db.ccTimerPosition = timerPos
-
-            -- Aura text
-            db.auraDurationTextSize = math.random(8, 14)
-            db.auraDurationTextColor = rColor()
-            db.auraStackTextSize = math.random(8, 14)
-            db.auraStackTextColor = rColor()
-            db.buffTextSize = math.random(8, 14)
-            db.buffTextColor = rColor()
-            db.ccTextSize = math.random(8, 14)
-            db.ccTextColor = rColor()
-
-            -- Raid marker (unified slot pick â€” exclusive with auras)
-            db.raidMarkerPos = pickAuraSlot()
-
-            -- Classification indicator slot
-            db.classificationSlot = pickAuraSlot()
-
-            -- Text slot sizes
-            db.textSlotTopSize = math.random(8, 14)
-            db.textSlotRightSize = math.random(8, 14)
-            db.textSlotLeftSize = math.random(8, 14)
-            db.textSlotCenterSize = math.random(8, 14)
-            -- Text slot offsets (all 0 for randomize)
-            db.textSlotTopXOffset = 0;    db.textSlotTopYOffset = 0
-            db.textSlotRightXOffset = 0;  db.textSlotRightYOffset = 0
-            db.textSlotLeftXOffset = 0;   db.textSlotLeftYOffset = 0
-            db.textSlotCenterXOffset = 0; db.textSlotCenterYOffset = 0
-
-            -- Hash line
-            db.hashLineEnabled = math.random() > 0.7
-            db.hashLinePercent = math.random(10, 50)
-            db.hashLineColor = rColor()
-
-            -- Focus cast height
-            db.focusCastHeight = 100 + math.random(0, 4) * 25
-
-            -- Font (pick from fontOrder, skipping separators)
-            local validFonts = {}
-            for _, f in ipairs(fontOrder) do
-                if f ~= "---" then validFonts[#validFonts + 1] = f end
-            end
-            db.font = pick(validFonts)
-
-            -- Class power custom color
-            db.classPowerCustomColor = rColor()
-            db.classPowerBgColor = { r = math.random(), g = math.random(), b = math.random(), a = 0.5 + math.random() * 0.5 }
-            db.classPowerEmptyColor = { r = math.random(), g = math.random(), b = math.random(), a = 0.5 + math.random() * 0.5 }
-
-            -- Colors (merged from Colors tab preset)
-            db.focusColorEnabled = true
-            db.tankHasAggroEnabled = true
-            db.focus = rColor()
-            db.caster = rColor()
-            db.miniboss = rColor()
-            db.enemyInCombat = rColor()
-            db.castBar = rColor()
-            db.interruptReady = rColor()
-            db.castBarUninterruptible = rColor()
-            db.tankHasAggro = rColor()
-            db.tankLosingAggro = rColor()
-            db.tankNoAggro = rColor()
-            db.dpsHasAggro = rColor()
-            db.dpsNearAggro = rColor()
-
-            -- Bar texture overlay
-            local texKeys = {}
-            for _, k in ipairs(ns.healthBarTextureOrder) do
-                if k ~= "---" then texKeys[#texKeys + 1] = k end
-            end
-            db.healthBarTexture = pick(texKeys)
-            db.healthBarTextureClassColor = math.random() > 0.5
-            if not db.healthBarTextureClassColor then
-                db.healthBarTextureColor = rColor()
-            end
-            db.healthBarTextureScale = (math.random(5, 20)) / 10
-            db.healthBarTextureFit = math.random() > 0.3
-        end
-        --]] -- END PRESET SYSTEM DISABLED
-
-        -- Set content header with presets centered above nameplate preview
+        -- Set content header with preview centered above nameplate preview
         _displayHeaderBuilder = function(headerParent, headerW)
-            --[[ Preset system disabled
-            local presetCheckDrift = EllesmereUI:BuildPresetSystem({
-                presetKeys  = displayPresetKeys,
-                dbFunc      = DB,
-                dbValFunc   = DBVal,
-                defaults    = defaults,
-                dbPrefix    = "",
-                randomizeFn = RandomizeDisplaySettings,
-                refreshFn   = function()
-                    ns.RefreshAllSettings()
-                    RefreshAllPlates()
-                    UpdatePreview()
-                    RefreshCoreEyes()
-                end,
-                plateRefreshFn = function()
-                    ns.RefreshAllSettings()
-                end,
-                previewRefreshFn = function()
-                    UpdatePreview()
-                    RefreshCoreEyes()
-                end,
-                headerParent = headerParent,
-                enableSpecFeature = true,
-            })
-            onPresetSettingChanged = presetCheckDrift
-            _displayPresetCheckDrift = presetCheckDrift
-            --]]
 
-            -- No preset controls â€” preview sits at top
             local PRESET_HEADER_H = 0
             local PREVIEW_TOP_PAD = 10
             local PREVIEW_BOTTOM_PAD = 5
@@ -3350,11 +3061,11 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUI:RefreshPage()
               end,
               order={ "ellesmere", "simple", "none" } },
-            { type="dropdown", text="Font", values=fontValues, order=fontOrder,
-              getValue=function() return DBVal("font") end,
+            { type="dropdown", text="Bar Texture", values=hbtValues, order=hbtOrder,
+              getValue=function() return DBVal("healthBarTexture") or "none" end,
               setValue=function(v)
-                DB().font = v
-                RefreshAllFonts()
+                DB().healthBarTexture = v
+                RefreshAllTextures()
                 UpdatePreview()
               end });  y = y - h
 
@@ -3395,17 +3106,6 @@ initFrame:SetScript("OnEvent", function(self)
                 if ns.ApplyHealthBarTexture then ns.ApplyHealthBarTexture(plate) end
             end
         end
-
-        local barTextureRow
-        barTextureRow, h = W:DualRow(parent, y,
-            { type="dropdown", text="Bar Texture", values=hbtValues, order=hbtOrder,
-              getValue=function() return DBVal("healthBarTexture") or "none" end,
-              setValue=function(v)
-                DB().healthBarTexture = v
-                RefreshAllTextures()
-                UpdatePreview()
-              end },
-            nil);  y = y - h
 
         _, h = W:Spacer(parent, y, 20);  y = y - h
 
@@ -4029,14 +3729,15 @@ initFrame:SetScript("OnEvent", function(self)
         end
 
         local textElementValues = {
-            enemyName     = "Enemy Name",
-            healthPercent = "Health Percent",
-            healthNumber  = "Health Number",
-            healthPctNum  = "Health % | #",
-            healthNumPct  = "Health # | %",
-            none          = "None",
+            enemyName            = "Enemy Name",
+            healthPercent        = "Health %",
+            healthPercentNoSign  = "Health % (No Sign)",
+            healthNumber         = "Health #",
+            healthPctNum         = "Health % | #",
+            healthNumPct         = "Health # | %",
+            none                 = "None",
         }
-        local textElementOrder = { "none", "---", "enemyName", "healthPercent", "healthNumber", "healthPctNum", "healthNumPct" }
+        local textElementOrder = { "none", "---", "enemyName", "healthPercent", "healthPercentNoSign", "healthNumber", "healthPctNum", "healthNumPct" }
 
         local function TextSlotSetValue(slotKey, v)
             SetTextElementAtSlot(slotKey, v)
@@ -4750,20 +4451,22 @@ initFrame:SetScript("OnEvent", function(self)
                 local function MkEdge()
                     local t = glowFrame:CreateTexture(nil, "OVERLAY", nil, 7)
                     t:SetColorTexture(c.r, c.g, c.b, 1)
+                    if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end
                     return t
                 end
                 glowFrame._top = MkEdge()
                 glowFrame._bot = MkEdge()
                 glowFrame._lft = MkEdge()
                 glowFrame._rgt = MkEdge()
-                glowFrame._top:SetHeight(2)
+                local glowPx = PP.Scale(2)
+                glowFrame._top:SetHeight(glowPx)
                 glowFrame._top:SetPoint("TOPLEFT"); glowFrame._top:SetPoint("TOPRIGHT")
-                glowFrame._bot:SetHeight(2)
+                glowFrame._bot:SetHeight(glowPx)
                 glowFrame._bot:SetPoint("BOTTOMLEFT"); glowFrame._bot:SetPoint("BOTTOMRIGHT")
-                glowFrame._lft:SetWidth(2)
+                glowFrame._lft:SetWidth(glowPx)
                 glowFrame._lft:SetPoint("TOPLEFT", glowFrame._top, "BOTTOMLEFT")
                 glowFrame._lft:SetPoint("BOTTOMLEFT", glowFrame._bot, "TOPLEFT")
-                glowFrame._rgt:SetWidth(2)
+                glowFrame._rgt:SetWidth(glowPx)
                 glowFrame._rgt:SetPoint("TOPRIGHT", glowFrame._top, "BOTTOMRIGHT")
                 glowFrame._rgt:SetPoint("BOTTOMRIGHT", glowFrame._bot, "TOPRIGHT")
             end
@@ -4857,7 +4560,7 @@ initFrame:SetScript("OnEvent", function(self)
             classIcon    = function() return ResolveCoreMapping("classification") end,
             enemyName    = function() return ResolveTextMapping("enemyName") end,
             healthText   = function()
-                local slot = FindTextSlotForElement("healthPercent") or FindTextSlotForElement("healthNumber") or FindTextSlotForElement("healthPctNum") or FindTextSlotForElement("healthNumPct")
+                local slot = FindTextSlotForElement("healthPercent") or FindTextSlotForElement("healthPercentNoSign") or FindTextSlotForElement("healthNumber") or FindTextSlotForElement("healthPctNum") or FindTextSlotForElement("healthNumPct")
                 if not slot then return { section = coreTextHeader, target = textRow1 } end
                 local info = textSlotToRow[slot]
                 if not info then return { section = coreTextHeader, target = textRow1 } end
@@ -4926,6 +4629,11 @@ initFrame:SetScript("OnEvent", function(self)
         --   hlAnchor     = frame â†’ draw highlight around this frame instead of btn
         --   hlBehindText = true  â†’ draw highlight on a child frame at icon level + 1
         --                          (text lives on a child frame at icon level + 2)
+        local function SnapPreview(val)
+            local s = activePreview and activePreview:GetEffectiveScale() or 1
+            if s <= 0 then s = 1 end
+            return math.floor(val * s + 0.5) / s
+        end
         local function CreateHitOverlay(element, mappingKey, isText, frameLevelOverride, opts)
             local anchor = isText and element:GetParent() or element
             -- If the element is a Texture (not a Frame), parent to its owner frame
@@ -4985,10 +4693,11 @@ initFrame:SetScript("OnEvent", function(self)
                 if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end
                 return t
             end
-            local ht = MkHL(); PP.Height(ht, 2); ht:SetPoint("TOPLEFT", hlAnchorFrame, "TOPLEFT"); ht:SetPoint("TOPRIGHT", hlAnchorFrame, "TOPRIGHT")
-            local hb = MkHL(); PP.Height(hb, 2); hb:SetPoint("BOTTOMLEFT", hlAnchorFrame, "BOTTOMLEFT"); hb:SetPoint("BOTTOMRIGHT", hlAnchorFrame, "BOTTOMRIGHT")
-            local hl = MkHL(); PP.Width(hl, 2); hl:SetPoint("TOPLEFT", ht, "BOTTOMLEFT"); hl:SetPoint("BOTTOMLEFT", hb, "TOPLEFT")
-            local hr = MkHL(); PP.Width(hr, 2); hr:SetPoint("TOPRIGHT", ht, "BOTTOMRIGHT"); hr:SetPoint("BOTTOMRIGHT", hb, "TOPRIGHT")
+            local hlPx = SnapPreview(2)
+            local ht = MkHL(); ht:SetHeight(hlPx); ht:SetPoint("TOPLEFT", hlAnchorFrame, "TOPLEFT"); ht:SetPoint("TOPRIGHT", hlAnchorFrame, "TOPRIGHT")
+            local hb = MkHL(); hb:SetHeight(hlPx); hb:SetPoint("BOTTOMLEFT", hlAnchorFrame, "BOTTOMLEFT"); hb:SetPoint("BOTTOMRIGHT", hlAnchorFrame, "BOTTOMRIGHT")
+            local hl = MkHL(); hl:SetWidth(hlPx); hl:SetPoint("TOPLEFT", ht, "BOTTOMLEFT"); hl:SetPoint("BOTTOMLEFT", hb, "TOPLEFT")
+            local hr = MkHL(); hr:SetWidth(hlPx); hr:SetPoint("TOPRIGHT", ht, "BOTTOMRIGHT"); hr:SetPoint("BOTTOMRIGHT", hb, "TOPRIGHT")
             btn._hlTextures = { ht, hb, hl, hr }
             local function ShowHL() for _, t in ipairs(btn._hlTextures) do t:Show() end end
             local function HideHL() for _, t in ipairs(btn._hlTextures) do t:Hide() end end
@@ -5063,10 +4772,11 @@ initFrame:SetScript("OnEvent", function(self)
                         if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end
                         return t
                     end
-                    local it = MkIOHL(); PP.Height(it, 2); it:SetPoint("TOPLEFT"); it:SetPoint("TOPRIGHT")
-                    local ib = MkIOHL(); PP.Height(ib, 2); ib:SetPoint("BOTTOMLEFT"); ib:SetPoint("BOTTOMRIGHT")
-                    local il = MkIOHL(); PP.Width(il, 2); il:SetPoint("TOPLEFT", it, "BOTTOMLEFT"); il:SetPoint("BOTTOMLEFT", ib, "TOPLEFT")
-                    local ir = MkIOHL(); PP.Width(ir, 2); ir:SetPoint("TOPRIGHT", it, "BOTTOMRIGHT"); ir:SetPoint("BOTTOMRIGHT", ib, "TOPRIGHT")
+                    local ioPx = SnapPreview(2)
+                    local it = MkIOHL(); it:SetHeight(ioPx); it:SetPoint("TOPLEFT"); it:SetPoint("TOPRIGHT")
+                    local ib = MkIOHL(); ib:SetHeight(ioPx); ib:SetPoint("BOTTOMLEFT"); ib:SetPoint("BOTTOMRIGHT")
+                    local il = MkIOHL(); il:SetWidth(ioPx); il:SetPoint("TOPLEFT", it, "BOTTOMLEFT"); il:SetPoint("BOTTOMLEFT", ib, "TOPLEFT")
+                    local ir = MkIOHL(); ir:SetWidth(ioPx); ir:SetPoint("TOPRIGHT", it, "BOTTOMRIGHT"); ir:SetPoint("BOTTOMRIGHT", ib, "TOPRIGHT")
                     iconOv._hlTextures = { it, ib, il, ir }
                     local function ShowIOHL() for _, t in ipairs(iconOv._hlTextures) do t:Show() end end
                     local function HideIOHL() for _, t in ipairs(iconOv._hlTextures) do t:Hide() end end
@@ -5086,10 +4796,11 @@ initFrame:SetScript("OnEvent", function(self)
                     if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end
                     return t
                 end
-                local ct = MkCHL(); PP.Height(ct, 2); ct:SetPoint("TOPLEFT"); ct:SetPoint("TOPRIGHT")
-                local cb = MkCHL(); PP.Height(cb, 2); cb:SetPoint("BOTTOMLEFT"); cb:SetPoint("BOTTOMRIGHT")
-                local cl = MkCHL(); PP.Width(cl, 2); cl:SetPoint("TOPLEFT", ct, "BOTTOMLEFT"); cl:SetPoint("BOTTOMLEFT", cb, "TOPLEFT")
-                local cr = MkCHL(); PP.Width(cr, 2); cr:SetPoint("TOPRIGHT", ct, "BOTTOMRIGHT"); cr:SetPoint("BOTTOMRIGHT", cb, "TOPRIGHT")
+                local coPx = SnapPreview(2)
+                local ct = MkCHL(); ct:SetHeight(coPx); ct:SetPoint("TOPLEFT"); ct:SetPoint("TOPRIGHT")
+                local cb = MkCHL(); cb:SetHeight(coPx); cb:SetPoint("BOTTOMLEFT"); cb:SetPoint("BOTTOMRIGHT")
+                local cl = MkCHL(); cl:SetWidth(coPx); cl:SetPoint("TOPLEFT", ct, "BOTTOMLEFT"); cl:SetPoint("BOTTOMLEFT", cb, "TOPLEFT")
+                local cr = MkCHL(); cr:SetWidth(coPx); cr:SetPoint("TOPRIGHT", ct, "BOTTOMRIGHT"); cr:SetPoint("BOTTOMRIGHT", cb, "TOPRIGHT")
                 castOverlay._hlTextures = { ct, cb, cl, cr }
                 local function ShowCHL() for _, t in ipairs(castOverlay._hlTextures) do t:Show() end end
                 local function HideCHL() for _, t in ipairs(castOverlay._hlTextures) do t:Hide() end end
@@ -5161,10 +4872,11 @@ initFrame:SetScript("OnEvent", function(self)
                         if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end
                         return t
                     end
-                    local cpt = MkCPHL(); PP.Height(cpt, 2); cpt:SetPoint("TOPLEFT"); cpt:SetPoint("TOPRIGHT")
-                    local cpb = MkCPHL(); PP.Height(cpb, 2); cpb:SetPoint("BOTTOMLEFT"); cpb:SetPoint("BOTTOMRIGHT")
-                    local cpl = MkCPHL(); PP.Width(cpl, 2); cpl:SetPoint("TOPLEFT", cpt, "BOTTOMLEFT"); cpl:SetPoint("BOTTOMLEFT", cpb, "TOPLEFT")
-                    local cpr = MkCPHL(); PP.Width(cpr, 2); cpr:SetPoint("TOPRIGHT", cpt, "BOTTOMRIGHT"); cpr:SetPoint("BOTTOMRIGHT", cpb, "TOPRIGHT")
+                    local cpPx = SnapPreview(2)
+                    local cpt = MkCPHL(); cpt:SetHeight(cpPx); cpt:SetPoint("TOPLEFT"); cpt:SetPoint("TOPRIGHT")
+                    local cpb = MkCPHL(); cpb:SetHeight(cpPx); cpb:SetPoint("BOTTOMLEFT"); cpb:SetPoint("BOTTOMRIGHT")
+                    local cpl = MkCPHL(); cpl:SetWidth(cpPx); cpl:SetPoint("TOPLEFT", cpt, "BOTTOMLEFT"); cpl:SetPoint("BOTTOMLEFT", cpb, "TOPLEFT")
+                    local cpr = MkCPHL(); cpr:SetWidth(cpPx); cpr:SetPoint("TOPRIGHT", cpt, "BOTTOMRIGHT"); cpr:SetPoint("BOTTOMRIGHT", cpb, "TOPRIGHT")
                     cpBtn._hlTextures = { cpt, cpb, cpl, cpr }
                     local function ShowCPHL() for _, t in ipairs(cpBtn._hlTextures) do t:Show() end end
                     local function HideCPHL() for _, t in ipairs(cpBtn._hlTextures) do t:Hide() end end
@@ -5202,15 +4914,16 @@ initFrame:SetScript("OnEvent", function(self)
                     return t
                 end
                 -- Highlight on left arrow
-                local alt = MkAHL(); PP.Height(alt, 2); alt:SetPoint("TOPLEFT", pv._arrows.left, -2, 2); alt:SetPoint("TOPRIGHT", pv._arrows.left, 2, 2)
-                local alb = MkAHL(); PP.Height(alb, 2); alb:SetPoint("BOTTOMLEFT", pv._arrows.left, -2, -2); alb:SetPoint("BOTTOMRIGHT", pv._arrows.left, 2, -2)
-                local all = MkAHL(); PP.Width(all, 2); all:SetPoint("TOPLEFT", alt, "BOTTOMLEFT"); all:SetPoint("BOTTOMLEFT", alb, "TOPLEFT")
-                local alr = MkAHL(); PP.Width(alr, 2); alr:SetPoint("TOPRIGHT", alt, "BOTTOMRIGHT"); alr:SetPoint("BOTTOMRIGHT", alb, "TOPRIGHT")
+                local aPx = SnapPreview(2)
+                local alt = MkAHL(); alt:SetHeight(aPx); alt:SetPoint("TOPLEFT", pv._arrows.left, -2, 2); alt:SetPoint("TOPRIGHT", pv._arrows.left, 2, 2)
+                local alb = MkAHL(); alb:SetHeight(aPx); alb:SetPoint("BOTTOMLEFT", pv._arrows.left, -2, -2); alb:SetPoint("BOTTOMRIGHT", pv._arrows.left, 2, -2)
+                local all = MkAHL(); all:SetWidth(aPx); all:SetPoint("TOPLEFT", alt, "BOTTOMLEFT"); all:SetPoint("BOTTOMLEFT", alb, "TOPLEFT")
+                local alr = MkAHL(); alr:SetWidth(aPx); alr:SetPoint("TOPRIGHT", alt, "BOTTOMRIGHT"); alr:SetPoint("BOTTOMRIGHT", alb, "TOPRIGHT")
                 -- Highlight on right arrow
-                local art = MkAHL(); PP.Height(art, 2); art:SetPoint("TOPLEFT", pv._arrows.right, -2, 2); art:SetPoint("TOPRIGHT", pv._arrows.right, 2, 2)
-                local arb = MkAHL(); PP.Height(arb, 2); arb:SetPoint("BOTTOMLEFT", pv._arrows.right, -2, -2); arb:SetPoint("BOTTOMRIGHT", pv._arrows.right, 2, -2)
-                local arl = MkAHL(); PP.Width(arl, 2); arl:SetPoint("TOPLEFT", art, "BOTTOMLEFT"); arl:SetPoint("BOTTOMLEFT", arb, "TOPLEFT")
-                local arr = MkAHL(); PP.Width(arr, 2); arr:SetPoint("TOPRIGHT", art, "BOTTOMRIGHT"); arr:SetPoint("BOTTOMRIGHT", arb, "TOPRIGHT")
+                local art = MkAHL(); art:SetHeight(aPx); art:SetPoint("TOPLEFT", pv._arrows.right, -2, 2); art:SetPoint("TOPRIGHT", pv._arrows.right, 2, 2)
+                local arb = MkAHL(); arb:SetHeight(aPx); arb:SetPoint("BOTTOMLEFT", pv._arrows.right, -2, -2); arb:SetPoint("BOTTOMRIGHT", pv._arrows.right, 2, -2)
+                local arl = MkAHL(); arl:SetWidth(aPx); arl:SetPoint("TOPLEFT", art, "BOTTOMLEFT"); arl:SetPoint("BOTTOMLEFT", arb, "TOPLEFT")
+                local arr = MkAHL(); arr:SetWidth(aPx); arr:SetPoint("TOPRIGHT", art, "BOTTOMRIGHT"); arr:SetPoint("BOTTOMRIGHT", arb, "TOPRIGHT")
                 arrowBtn._hlTextures = { alt, alb, all, alr, art, arb, arl, arr }
                 local function ShowAHL() for _, t in ipairs(arrowBtn._hlTextures) do t:Show() end end
                 local function HideAHL() for _, t in ipairs(arrowBtn._hlTextures) do t:Hide() end end
@@ -5396,9 +5109,9 @@ initFrame:SetScript("OnEvent", function(self)
                 for _, slot in ipairs(barSlots) do
                     local element = DBVal(slot.key) or defaults[slot.key]
                     local sc = (DB() and DB()[slot.key .. "Color"]) or defaults[slot.key .. "Color"]
-                    if element == "healthPercent" then
+                    if element == "healthPercent" or element == "healthPercentNoSign" then
                         pctFS:SetTextColor(sc.r, sc.g, sc.b, 1)
-                        pctFS:SetText(healthPct .. "%")
+                        pctFS:SetText(element == "healthPercentNoSign" and tostring(healthPct) or (healthPct .. "%"))
                         pctFS:SetPoint(slot.anchor, health, slot.anchor, slot.xOff, 0)
                         pctFS:Show()
                     elseif element == "healthNumber" then

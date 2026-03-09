@@ -465,7 +465,8 @@ end
 -- flat pixel assumptions based on typical worst-case rendered widths.
 local HEALTH_TEXT_PADDING = 10  -- safety margin in px
 local healthTextWidths = {
-    healthPercent = 38,
+    healthPercent       = 38,
+    healthPercentNoSign = 38,
     healthNumber  = 38,
     healthPctNum  = 75,
     healthNumPct  = 75,
@@ -1057,29 +1058,9 @@ local frameCache = CreateFramePool("Frame", UIParent, nil, nil, false, function(
     end
     local function AddBorder(parent)
         local PP = EllesmereUI and EllesmereUI.PP
-        local function MkBorderTex()
-            local tex = parent:CreateTexture(nil, "OVERLAY", nil, 5)
-            tex:SetColorTexture(0, 0, 0, 1)
-            if PP then PP.DisablePixelSnap(tex) end
-            return tex
+        if PP then
+            PP.CreateBorder(parent, 0, 0, 0, 1, 1, "OVERLAY", 5)
         end
-        local s = PP and PP.Scale(1) or 1
-        local t = MkBorderTex()
-        t:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
-        t:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
-        t:SetHeight(s)
-        local b = MkBorderTex()
-        b:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
-        b:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
-        b:SetHeight(s)
-        local l = MkBorderTex()
-        l:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
-        l:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
-        l:SetWidth(s)
-        local r = MkBorderTex()
-        r:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
-        r:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
-        r:SetWidth(s)
     end
     local BORDER_TEX = "Interface\\AddOns\\EllesmereUINameplates\\Media\\border-colorless.png"
     local BORDER_TEX_SIMPLE = "Interface\\AddOns\\EllesmereUINameplates\\Media\\border-simple.png"
@@ -1261,7 +1242,7 @@ local frameCache = CreateFramePool("Frame", UIParent, nil, nil, false, function(
     do local PP = EllesmereUI and EllesmereUI.PP
         if PP then PP.DisablePixelSnap(plate.castLeftBorder) end
     end
-    plate.castLeftBorder:SetWidth(PP and PP.Scale(1) or 1)
+    plate.castLeftBorder:SetWidth(1)
     plate.castLeftBorder:SetPoint("TOPLEFT", plate.cast, "TOPLEFT", 0, 0)
     plate.castLeftBorder:SetPoint("BOTTOMLEFT", plate.cast, "BOTTOMLEFT", 0, 0)
     -- Icon frame hangs outside the cast bar's left edge.
@@ -1696,12 +1677,6 @@ kickWatcher:SetScript("OnEvent", function(self, event)
                 end
             end
         end
-        -- Minimap button (shared across all Ellesmere addons â€” first to load wins)
-        if event == "PLAYER_LOGIN" and not _EllesmereUI_MinimapRegistered then
-            if EllesmereUI and EllesmereUI.CreateMinimapButton then
-                EllesmereUI.CreateMinimapButton()
-            end
-        end
         -- Blizzard options panel is registered centrally in EllesmereUI.lua
         RefreshKickAbility()
     end
@@ -1886,6 +1861,7 @@ local CLASS_POWER_MAP = {
     EVOKER      = { Enum.PowerType.Essence,      5 },
     DEMONHUNTER = { [581] = { "SOUL_FRAGMENTS_VENGEANCE", 6 } },  -- Vengeance only (secret value)
     SHAMAN      = { [263] = { "MAELSTROM_WEAPON", 10 } },  -- Enhancement only
+    PRIEST      = { [258] = { "INSANITY_BAR", 100 } },     -- Shadow only
     HUNTER      = { [255] = { "TIP_OF_THE_SPEAR", 3 } },   -- Survival only
     WARRIOR     = { [72]  = { "WHIRLWIND_STACKS", 4 } },    -- Fury only
 }
@@ -2013,6 +1989,42 @@ local function UpdateClassPowerOnPlate(plate)
         return
     end
 
+    -- Bar-type resource (Shadow Priest Insanity): single StatusBar
+    if classPowerType == "INSANITY_BAR" then
+        for i = 1, #plate._cpPips do
+            plate._cpPips[i]:Hide()
+            if plate._cpPips[i]._bg then plate._cpPips[i]._bg:Hide() end
+            if plate._cpPips[i]._secretBar then plate._cpPips[i]._secretBar:Hide() end
+        end
+        EnsureClassPowerBar(plate)
+        local bar = plate._cpBar
+        local cur = UnitPower("player", 13) or 0  -- Enum.PowerType.Insanity = 13
+        local maxI = UnitPowerMax("player", 13) or 100
+        if issecretvalue and issecretvalue(maxI) then maxI = 100 end
+        if not maxI or maxI <= 0 then maxI = 100 end
+
+        local scaledW = CP_PIP_W * cpScale * 6
+        local scaledH = CP_PIP_H * cpScale
+        bar:ClearAllPoints()
+        bar:SetSize(scaledW, scaledH)
+        bar:SetPoint(anchorPoint, anchorFrame, anchorRelPoint,
+            cpXOff, yDir * cpYOff)
+        bar:SetMinMaxValues(0, maxI)
+        bar:SetValue(cur)
+
+        local _, pClass = UnitClass("player")
+        local cpColor = CP_CLASS_COLORS[pClass] or CP_DEFAULT_COLOR
+        if not GetClassPowerClassColors() then
+            local cc = GetClassPowerCustomColor()
+            cpColor = { cc.r, cc.g, cc.b }
+        end
+        bar:SetStatusBarColor(cpColor[1], cpColor[2], cpColor[3], 1)
+
+        bar._bg:SetColorTexture(bgCol.r, bgCol.g, bgCol.b, bgCol.a)
+        bar:Show()
+        return
+    end
+
     -- Hide bar if switching from bar-type to pip-type
     if plate._cpBar then plate._cpBar:Hide() end
 
@@ -2048,11 +2060,17 @@ local function UpdateClassPowerOnPlate(plate)
         return
     end
 
-    local scaledW = CP_PIP_W * cpScale
-    local scaledH = CP_PIP_H * cpScale
-    local scaledGap = GetClassPowerGap() * cpScale
-    local totalW = maxP * scaledW + (maxP - 1) * scaledGap
-    local startX = -totalW / 2 + scaledW / 2
+    local scaledW = PP.Scale(CP_PIP_W * cpScale)
+    local scaledH = PP.Scale(CP_PIP_H * cpScale)
+    local scaledGap = PP.Scale(GetClassPowerGap() * cpScale)
+    -- Pre-compute each pip's left-edge X in group-local coords.
+    -- Position by BOTTOMLEFT/TOPLEFT to avoid half-pixel center offsets.
+    local pipPositions = {}
+    for idx = 1, maxP do
+        pipPositions[idx] = PP.Scale((idx - 1) * (scaledW + scaledGap))
+    end
+    local groupW = pipPositions[maxP] + scaledW
+    local halfGroup = PP.Scale(groupW / 2)
 
     local _, pClass = UnitClass("player")
     local cpColor = CP_DEFAULT_COLOR
@@ -2065,13 +2083,16 @@ local function UpdateClassPowerOnPlate(plate)
 
     local emptyCol = GetClassPowerEmptyColor()
 
+    local leftAnchor = (anchorPoint == "BOTTOM") and "BOTTOMLEFT" or "TOPLEFT"
+
     for i = 1, #plate._cpPips do
         local pip = plate._cpPips[i]
         if i <= maxP then
             pip:ClearAllPoints()
             PP.Size(pip, scaledW, scaledH)
-            PP.Point(pip, anchorPoint, anchorFrame, anchorRelPoint,
-                startX + (i - 1) * (scaledW + scaledGap) + cpXOff, yDir * cpYOff)
+            local pipLeftX = PP.Scale(pipPositions[i] - halfGroup + cpXOff)
+            pip:SetPoint(leftAnchor, anchorFrame, anchorRelPoint,
+                pipLeftX, PP.Scale(yDir * cpYOff))
 
             -- Background texture behind each pip
             local bg = pip._bg
@@ -2393,13 +2414,16 @@ local function IsQuestMob(unit)
         elseif lt == Enum.TooltipDataLineType.QuestTitle then
             ignoreUntilTitle = false
         elseif lt == Enum.TooltipDataLineType.QuestObjective and not ignoreUntilTitle then
-            local c1, c2 = (line.leftText or ""):match("(%d+)/(%d+)")
-            if c1 and c1 ~= c2 then
-                questMobCache[unit] = true
-                return true
-            end
-            local pct = (line.leftText or ""):match("(%d+)%%")
-            if pct and pct ~= "100" then
+            -- leftText may be a tainted secret string; wrap in pcall
+            local ok, isIncomplete = pcall(function()
+                local txt = line.leftText or ""
+                local c1, c2 = txt:match("(%d+)/(%d+)")
+                if c1 and c1 ~= c2 then return true end
+                local pct = txt:match("(%d+)%%")
+                if pct and pct ~= "100" then return true end
+                return false
+            end)
+            if ok and isIncomplete then
                 questMobCache[unit] = true
                 return true
             end
@@ -3106,15 +3130,19 @@ function NameplateFrame:UpdateHealthValues()
     end
 
     -- Compute text strings
-    local pctText, numText
+    local pctText, pctNoSignText, numText
     if UnitIsDeadOrGhost(unit) then
         pctText = "0%"
+        pctNoSignText = "0"
         numText = "0"
     elseif UnitHealthPercent then
-        pctText = string.format("%d%%", UnitHealthPercent(unit, true, CurveConstants.ScaleTo100))
+        local pctVal = UnitHealthPercent(unit, true, CurveConstants.ScaleTo100)
+        pctText = string.format("%d%%", pctVal)
+        pctNoSignText = string.format("%d", pctVal)
         numText = AbbreviateNumbers(UnitHealth(unit))
     else
         pctText = ""
+        pctNoSignText = ""
         numText = ""
     end
 
@@ -3135,10 +3163,10 @@ function NameplateFrame:UpdateHealthValues()
         local txOff, tyOff = GetTextSlotOffsets(slot.key)
         local slotFontSz = GetTextSlotSize(slot.key)
         local sr, sg, sb = GetTextSlotColor(slot.key)
-        if element == "healthPercent" then
+        if element == "healthPercent" or element == "healthPercentNoSign" then
             self.hpText:SetParent(self.healthTextFrame)
             SetFSFont(self.hpText, slotFontSz, GetNPOutline())
-            self.hpText:SetText(pctText)
+            self.hpText:SetText(element == "healthPercentNoSign" and pctNoSignText or pctText)
             self.hpText:ClearAllPoints()
             if slot.anchor == "CENTER" then
                 self.hpText:SetPoint("CENTER", self.health, "CENTER", txOff, tyOff)
@@ -3179,7 +3207,7 @@ function NameplateFrame:UpdateHealthValues()
 
     -- Process top slot for health elements
     local topElement = GetTextSlot("textSlotTop")
-    if topElement == "healthPercent" or topElement == "healthNumber"
+    if topElement == "healthPercent" or topElement == "healthPercentNoSign" or topElement == "healthNumber"
        or topElement == "healthPctNum" or topElement == "healthNumPct" then
         local nameYOff = GetNameYOffset()
         local cpPush = GetClassPowerTopPush(self)
@@ -3194,6 +3222,8 @@ function NameplateFrame:UpdateHealthValues()
             fs = self.hpText
             if topElement == "healthPercent" then
                 fs:SetText(pctText)
+            elseif topElement == "healthPercentNoSign" then
+                fs:SetText(pctNoSignText)
             else
                 fs:SetText(FormatCombinedHealth(topElement, pctText, numText))
             end
@@ -4562,6 +4592,15 @@ end
 local npAddon = EllesmereUI.Lite.NewAddon("EllesmereUINameplatesInit")
 function npAddon:OnInitialize()
     InitDB()
+    -- Append SharedMedia textures to runtime tables so SM texture keys resolve at runtime
+    if EllesmereUI.AppendSharedMediaTextures then
+        EllesmereUI.AppendSharedMediaTextures(
+            ns.healthBarTextureNames,
+            ns.healthBarTextureOrder,
+            nil,
+            ns.healthBarTextures
+        )
+    end
 end
 function npAddon:OnEnable()
     SetupAuraCVars()

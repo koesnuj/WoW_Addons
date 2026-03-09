@@ -273,7 +273,7 @@ initFrame:SetScript("OnEvent", function(self)
             btn:Show()
         end
 
-        -- Recalculate total preview height and compensate scroll offset
+        -- Recalculate total preview height: hardcoded 80px
         do
             local textYOff2 = d.textYOffset or -2
             local textSz2 = d.textSize or 11
@@ -281,11 +281,15 @@ initFrame:SetScript("OnEvent", function(self)
             local CONTAINER_H = sz + textOverhang2
             if _previewContainer then
                 _previewContainer:SetHeight(CONTAINER_H)
+                _previewContainer:ClearAllPoints()
+                _previewContainer:SetPoint("CENTER", _previewContainer:GetParent(), "CENTER", 0, 0)
             end
-            local TOTAL_H = 15 + CONTAINER_H + 15
+            local TOTAL_H = 80
             _eabrHeaderBaseH = TOTAL_H
             local hintH = (_previewHintFS and _previewHintFS:IsShown()) and 35 or 0
-            EllesmereUI:UpdateContentHeaderHeight(TOTAL_H + hintH)
+            -- Use the silent variant so resizing the header never triggers
+            -- scroll compensation (the height rarely changes here).
+            EllesmereUI:SetContentHeaderHeightSilent(TOTAL_H + hintH)
         end
     end
 
@@ -427,10 +431,10 @@ initFrame:SetScript("OnEvent", function(self)
             if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end
             return t
         end
-        local ht = MkHL(); PP.Height(ht, 2); ht:SetPoint("TOPLEFT", btn, "TOPLEFT"); ht:SetPoint("TOPRIGHT", btn, "TOPRIGHT")
-        local hb = MkHL(); PP.Height(hb, 2); hb:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT"); hb:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT")
-        local hl = MkHL(); PP.Width(hl, 2); hl:SetPoint("TOPLEFT", ht, "BOTTOMLEFT"); hl:SetPoint("BOTTOMLEFT", hb, "TOPLEFT")
-        local hr = MkHL(); PP.Width(hr, 2); hr:SetPoint("TOPRIGHT", ht, "BOTTOMRIGHT"); hr:SetPoint("BOTTOMRIGHT", hb, "TOPRIGHT")
+        local ht = MkHL(); ht:SetHeight(2); ht:SetPoint("TOPLEFT", btn, "TOPLEFT"); ht:SetPoint("TOPRIGHT", btn, "TOPRIGHT")
+        local hb = MkHL(); hb:SetHeight(2); hb:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT"); hb:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT")
+        local hl = MkHL(); hl:SetWidth(2); hl:SetPoint("TOPLEFT", ht, "BOTTOMLEFT"); hl:SetPoint("BOTTOMLEFT", hb, "TOPLEFT")
+        local hr = MkHL(); hr:SetWidth(2); hr:SetPoint("TOPRIGHT", ht, "BOTTOMRIGHT"); hr:SetPoint("BOTTOMRIGHT", hb, "TOPRIGHT")
         btn._hlTextures = { ht, hb, hl, hr }
         local function ShowHL() for _, t in ipairs(btn._hlTextures) do t:Show() end end
         local function HideHL() for _, t in ipairs(btn._hlTextures) do t:Hide() end end
@@ -453,13 +457,13 @@ initFrame:SetScript("OnEvent", function(self)
         local tc = d and d.textColor or {r=1, g=1, b=1}
         local opacity = d and d.opacity or 1.0
 
-        -- Container for icons
+        -- Container for icons (centered within hardcoded 80px header)
         local textYOff = d and d.textYOffset or -2
         local textSz = d and d.textSize or 11
         local textOverhang = showText and (math.abs(textYOff) + textSz) or 0
         local container = CreateFrame("Frame", nil, hdr)
         container:SetSize(hdrW, sz + textOverhang)
-        container:SetPoint("TOP", hdr, "TOP", 0, -15)
+        container:SetPoint("CENTER", hdr, "CENTER", 0, 0)
         _previewContainer = container
 
         -- Create icon frames
@@ -523,11 +527,7 @@ initFrame:SetScript("OnEvent", function(self)
             _previewHintFS = nil
         end
         local hintShown = not IsPreviewHintDismissed()
-        local textYOff = d and d.textYOffset or -2
-        local textSize = d and d.textSize or 11
-        local textOverhang = showText and (math.abs(textYOff) + textSize) or 0
-        local CONTAINER_H = sz + textOverhang
-        local TOTAL_H = 15 + CONTAINER_H + 15
+        local TOTAL_H = 80
         _eabrHeaderBaseH = TOTAL_H
 
         if hintShown then
@@ -596,7 +596,7 @@ initFrame:SetScript("OnEvent", function(self)
                 local div = rowFrame:CreateTexture(nil, "ARTWORK")
                 div:SetColorTexture(1, 1, 1, 0.06)
                 if div.SetSnapToPixelGrid then div:SetSnapToPixelGrid(false); div:SetTexelSnappingBias(0) end
-                PP.Width(div, 1)
+                div:SetWidth(1)
                 local xPos = d * colW
                 PP.Point(div, "TOP", rowFrame, "TOPLEFT", xPos, 0)
                 PP.Point(div, "BOTTOM", rowFrame, "BOTTOMLEFT", xPos, 0)
@@ -1739,7 +1739,7 @@ initFrame:SetScript("OnEvent", function(self)
                 bg:SetColorTexture(0, 0, 0, alpha)
                 local div = emptyRow:CreateTexture(nil, "ARTWORK")
                 div:SetColorTexture(1, 1, 1, 0.06)
-                PP.Width(div, 1)
+                div:SetWidth(1)
                 PP.Point(div, "TOP", emptyRow, "TOP", 0, 0)
                 PP.Point(div, "BOTTOM", emptyRow, "BOTTOM", 0, 0)
                 local emptyFS = emptyRow:CreateFontString(nil, "OVERLAY")
@@ -1773,7 +1773,7 @@ initFrame:SetScript("OnEvent", function(self)
                 -- Center divider
                 local div = row:CreateTexture(nil, "ARTWORK")
                 div:SetColorTexture(1, 1, 1, 0.06)
-                PP.Width(div, 1)
+                div:SetWidth(1)
                 PP.Point(div, "TOP", row, "TOP", 0, 0)
                 PP.Point(div, "BOTTOM", row, "BOTTOM", 0, 0)
                 return row

@@ -27,7 +27,7 @@ initFrame:SetScript("OnEvent", function(self)
     local frames = ns.frames
     local ReloadFrames = ns.ReloadFrames
     local ResolveFontPath = ns.ResolveFontPath
-    local fontPaths = ns.fontPaths or {}
+    -- fontPaths removed — all modules use EllesmereUI.GetFontPath() now
 
     local floor = math.floor
     local abs = math.abs
@@ -87,22 +87,6 @@ initFrame:SetScript("OnEvent", function(self)
             if pv and pv._disabledOverlay then pv._disabledOverlay:Hide() end
         end
     end)
-
-    ---------------------------------------------------------------------------
-    --  Font dropdown values
-    ---------------------------------------------------------------------------
-    local fontValues = {}
-    for name, path in pairs(fontPaths) do
-        fontValues[name] = { text = name, font = path }
-    end
-    local fontOrder = {
-        "Expressway", "Avant Garde", "Arial Bold", "Poppins", "Fira Sans Medium",
-        "---",
-        "Arial Narrow", "Changa", "Cinzel Decorative", "Exo",
-        "Fira Sans Bold", "Fira Sans Light", "Future X Black",
-        "Gotham Narrow Ultra", "Gotham Narrow", "Russo One", "Ubuntu",
-        "Friz Quadrata", "Arial", "Morpheus", "Skurri",
-    }
 
     ---------------------------------------------------------------------------
     --  Individual Display unit selector
@@ -249,6 +233,16 @@ initFrame:SetScript("OnEvent", function(self)
     ---------------------------------------------------------------------------
     --  Health bar texture dropdown values (built from ns tables)
     ---------------------------------------------------------------------------
+    -- Append SharedMedia textures so the dropdown includes SM entries
+    if EllesmereUI.AppendSharedMediaTextures then
+        EllesmereUI.AppendSharedMediaTextures(
+            ns.healthBarTextureNames or {},
+            ns.healthBarTextureOrder or {},
+            nil,
+            ns.healthBarTextures
+        )
+    end
+
     local hbtValues = {}
     local hbtOrder = {}
     do
@@ -275,10 +269,10 @@ initFrame:SetScript("OnEvent", function(self)
                         if hFill then
                             if texPath then
                                 hFill:SetTexture(texPath)
-                                hFill:SetVertexColor(pv._hR or 0.8, pv._hG or 0.2, pv._hB or 0.2, pv._hA or 1)
+                                hFill:SetVertexColor(pv._hR or 0.8, pv._hG or 0.2, pv._hB or 0.2, 1)
                             else
                                 hFill:SetVertexColor(1, 1, 1, 1)
-                                hFill:SetColorTexture(pv._hR or 0.8, pv._hG or 0.2, pv._hB or 0.2, pv._hA or 1)
+                                hFill:SetColorTexture(pv._hR or 0.8, pv._hG or 0.2, pv._hB or 0.2, 1)
                             end
                         end
                         local pFill = pv._powerFill
@@ -344,27 +338,31 @@ initFrame:SetScript("OnEvent", function(self)
     ---------------------------------------------------------------------------
     -- Health bar text dropdown values (no power options)
     local healthTextValues = {
-        ["name"]       = "Name",
-        ["both"]       = "Health Value | Health %",
-        ["curhpshort"] = "Health Value",
-        ["perhp"]      = "Health %",
-        ["none"]       = "None",
+        ["name"]         = "Name",
+        ["perhp"]        = "Health %",
+        ["perhpnosign"]  = "Health % (No Sign)",
+        ["curhpshort"]   = "Health #",
+        ["perhpnum"]     = "Health % | #",
+        ["both"]         = "Health # | %",
+        ["none"]         = "None",
     }
-    local healthTextOrder = { "none", "---", "name", "both", "curhpshort", "perhp" }
+    local healthTextOrder = { "none", "---", "name", "perhp", "perhpnosign", "curhpshort", "perhpnum", "both" }
 
     -- Text bar (BTB) text dropdown values (includes power options)
     local btbTextValues = {
-        ["name"]       = "Name",
-        ["both"]       = "Health Value | Health %",
-        ["curhpshort"] = "Health Value",
-        ["perhp"]      = "Health %",
-        ["perpp"]      = "Power %",
-        ["curpp"]      = "Power Value",
-        ["curhp_curpp"] = "Health | Power Value",
-        ["perhp_perpp"] = "Health | Power %",
-        ["none"]       = "None",
+        ["name"]         = "Name",
+        ["perhp"]        = "Health %",
+        ["perhpnosign"]  = "Health % (No Sign)",
+        ["curhpshort"]   = "Health #",
+        ["perhpnum"]     = "Health % | #",
+        ["both"]         = "Health # | %",
+        ["perpp"]        = "Power %",
+        ["curpp"]        = "Power Value",
+        ["curhp_curpp"]  = "Health | Power Value",
+        ["perhp_perpp"]  = "Health | Power %",
+        ["none"]         = "None",
     }
-    local btbTextOrder = { "none", "---", "name", "both", "curhpshort", "perhp", "perpp", "curpp", "curhp_curpp", "perhp_perpp" }
+    local btbTextOrder = { "none", "---", "name", "perhp", "perhpnosign", "curhpshort", "perhpnum", "both", "perpp", "curpp", "curhp_curpp", "perhp_perpp" }
 
     -- Class theme portrait icons (full-size versions of the sidebar class art)
     -- Always use EllesmereUIUnitFrames path since only that addon ships the -full.png files
@@ -853,13 +851,20 @@ initFrame:SetScript("OnEvent", function(self)
             portraitTex:SetTexCoord(0.15, 0.85, 0.15, 0.85)
             UnsnapTex(portraitTex)
 
-            -- 3D model for preview (uses player model for all unit previews)
-            local portraitModel = CreateFrame("PlayerModel", nil, portraitFrame)
-            portraitModel:SetPoint("TOPLEFT", portraitFrame, "TOPLEFT", 0, 0)
-            portraitModel:SetPoint("BOTTOMRIGHT", portraitFrame, "BOTTOMRIGHT", 0, 0)
-            portraitModel:SetUnit("player")
-            portraitModel:SetCamera(0)
-            portraitModel:Hide()
+            -- 3D model for preview (lazy-created only when mode is "3d")
+            local portraitModel = nil
+
+            local function EnsurePreviewModel()
+                if portraitModel then return portraitModel end
+                portraitModel = CreateFrame("PlayerModel", nil, portraitFrame)
+                portraitModel:SetPoint("TOPLEFT", portraitFrame, "TOPLEFT", 0, 0)
+                portraitModel:SetPoint("BOTTOMRIGHT", portraitFrame, "BOTTOMRIGHT", 0, 0)
+                portraitModel:SetUnit("player")
+                portraitModel:SetCamera(0)
+                portraitModel:Hide()
+                portraitFrame._previewModel = portraitModel
+                return portraitModel
+            end
 
             local function ApplyPortraitMode()
                 -- Read settings fresh from DB so the closure never goes stale
@@ -876,12 +881,13 @@ initFrame:SetScript("OnEvent", function(self)
                 if mode == "3d" then
                     portraitFrame:Show()
                     portraitTex:Hide()
-                    portraitModel:SetUnit("player")
-                    portraitModel:SetCamera(0)
-                    portraitModel:Show()
+                    local pm = EnsurePreviewModel()
+                    pm:SetUnit("player")
+                    pm:SetCamera(0)
+                    pm:Show()
                 elseif mode == "class" then
                     portraitFrame:Show()
-                    portraitModel:Hide()
+                    if portraitModel then portraitModel:Hide() end
                     portraitTex:Show()
                     local _, ct = UnitClass("player")
                     local cts = curSettings.classThemeStyle or "modern"
@@ -897,7 +903,7 @@ initFrame:SetScript("OnEvent", function(self)
                     PP.Point(portraitTex, "BOTTOMRIGHT", portraitFrame, "BOTTOMRIGHT", -inset, inset)
                 else
                     portraitFrame:Show()
-                    portraitModel:Hide()
+                    if portraitModel then portraitModel:Hide() end
                     portraitTex:Show()
                     SetPortraitTexture(portraitTex, "player")
                     portraitTex:SetTexCoord(0.15, 0.85, 0.15, 0.85)
@@ -925,8 +931,13 @@ initFrame:SetScript("OnEvent", function(self)
             hR, hG, hB, hA = 0x11/255, 0x11/255, 0x11/255, 0.90
             bgR, bgG, bgB, bgA = 0x4f/255, 0x4f/255, 0x4f/255, 1
         else
-            hA = 1
-            if unitKey == "player" then
+            hA = 0.9
+            -- Check for custom fill color
+            local cFill = settings.customFillColor
+            if cFill then
+                hR, hG, hB = cFill.r, cFill.g, cFill.b
+                if cFill.a then hA = cFill.a end
+            elseif unitKey == "player" then
                 local _, classToken = UnitClass("player")
                 local cc = RAID_CLASS_COLORS[classToken]
                 if cc then hR, hG, hB = cc.r, cc.g, cc.b
@@ -936,7 +947,14 @@ initFrame:SetScript("OnEvent", function(self)
             else
                 hR, hG, hB = 0.8, 0.2, 0.2
             end
-            bgR, bgG, bgB, bgA = hR * 0.2, hG * 0.2, hB * 0.2, 0.75
+            -- Check for custom background color
+            local cBg = settings.customBgColor
+            if cBg then
+                bgR, bgG, bgB = cBg.r, cBg.g, cBg.b
+                bgA = cBg.a or 0.75
+            else
+                bgR, bgG, bgB, bgA = hR * 0.2, hG * 0.2, hB * 0.2, 0.75
+            end
         end
 
         -- Health bar
@@ -950,7 +968,8 @@ initFrame:SetScript("OnEvent", function(self)
         else
             healthBgColor:SetAllPoints()
         end
-        healthBgColor:SetColorTexture(bgR, bgG, bgB, bgA)
+        healthBgColor:SetColorTexture(bgR, bgG, bgB, 1)
+        healthBgColor:SetAlpha(bgA)
         UnsnapTex(healthBgColor)
         if showPortrait and portraitFrame then
             if side == "left" then
@@ -971,7 +990,8 @@ initFrame:SetScript("OnEvent", function(self)
         healthFill:SetPoint("TOPLEFT", health, "TOPLEFT", 0, 0)
         healthFill:SetPoint("BOTTOMLEFT", health, "BOTTOMLEFT", 0, 0)
         healthFill:SetWidth(math.floor(frameW * (_previewHealthPct or 0.70) + 0.5))
-        healthFill:SetColorTexture(hR, hG, hB, hA)
+        healthFill:SetColorTexture(hR, hG, hB, 1)
+        healthFill:SetAlpha(hA)
         UnsnapTex(healthFill)
         pf._healthFill = healthFill
         pf._hR, pf._hG, pf._hB, pf._hA = hR, hG, hB, hA
@@ -1010,13 +1030,15 @@ initFrame:SetScript("OnEvent", function(self)
                 else
                     return _previewCreatureNames[unitKey] or unitKey
                 end
-            elseif content == "both" or content == "curhpshort" or content == "perhp" then
+            elseif content == "both" or content == "curhpshort" or content == "perhp" or content == "perhpnosign" or content == "perhpnum" then
                 local maxHP = UnitHealthMax("player") or 1
                 local pct = _previewHealthPct or 0.70
                 local curHP = math.floor(maxHP * pct)
                 local pctInt = math.floor(pct * 100)
                 if content == "curhpshort" then return AbbreviateLargeNumbers(curHP)
                 elseif content == "perhp" then return pctInt .. "%"
+                elseif content == "perhpnosign" then return tostring(pctInt)
+                elseif content == "perhpnum" then return pctInt .. "% | " .. AbbreviateLargeNumbers(curHP)
                 else return AbbreviateLargeNumbers(curHP) .. " | " .. pctInt .. "%" end
             elseif content == "perpp" then
                 local ppPct = _previewPowerPct or 0.85
@@ -1140,16 +1162,36 @@ initFrame:SetScript("OnEvent", function(self)
             PP.Size(power, frameW, powerH)
             local powerBg = power:CreateTexture(nil, "BACKGROUND")
             powerBg:SetAllPoints()
-            powerBg:SetColorTexture(0.2 * 0.3, 0.35 * 0.3, 0.85 * 0.3, 1)
             UnsnapTex(powerBg)
             pf._powerBg = powerBg
             local powerFill = power:CreateTexture(nil, "ARTWORK")
             powerFill:SetPoint("TOPLEFT", power, "TOPLEFT", 0, 0)
             powerFill:SetPoint("BOTTOMLEFT", power, "BOTTOMLEFT", 0, 0)
             powerFill:SetWidth(math.floor(frameW * (_previewPowerPct or 0.85) + 0.5))
-            powerFill:SetColorTexture(0.2, 0.35, 0.85, 1)
             UnsnapTex(powerFill)
             pf._powerFill = powerFill
+
+            -- Apply custom power bar colors or default
+            local customPFill = settings.customPowerFillColor
+            local customPBg = settings.customPowerBgColor
+            local pfR, pfG, pfB = 0.2, 0.35, 0.85
+            local pbR, pbG, pbB = pfR * 0.3, pfG * 0.3, pfB * 0.3
+            local pfA = 1.0
+            local pbA = 0.5
+            if customPFill then
+                pfR, pfG, pfB = customPFill.r, customPFill.g, customPFill.b
+                if customPFill.a then pfA = customPFill.a end
+            end
+            if customPBg then
+                pbR, pbG, pbB = customPBg.r, customPBg.g, customPBg.b
+                if customPBg.a then pbA = customPBg.a end
+            else
+                pbR, pbG, pbB = pfR * 0.3, pfG * 0.3, pfB * 0.3
+            end
+            powerBg:SetColorTexture(pbR, pbG, pbB, 1)
+            powerBg:SetAlpha(pbA)
+            powerFill:SetColorTexture(pfR, pfG, pfB, 1)
+            powerFill:SetAlpha(pfA)
             -- Initial anchor based on power position
             if initPpPos == "none" then
                 power:Hide()
@@ -1179,10 +1221,13 @@ initFrame:SetScript("OnEvent", function(self)
 
             if texPath then
                 healthFill:SetTexture(texPath)
-                healthFill:SetVertexColor(hR, hG, hB, hA)
+                healthFill:SetVertexColor(hR, hG, hB, 1)
                 if pf._powerFill and powerH > 0 then
                     pf._powerFill:SetTexture(texPath)
-                    pf._powerFill:SetVertexColor(0.2, 0.35, 0.85, 1)
+                    local cpf = settings.customPowerFillColor
+                    local txR, txG, txB = 0.2, 0.35, 0.85
+                    if cpf then txR, txG, txB = cpf.r, cpf.g, cpf.b end
+                    pf._powerFill:SetVertexColor(txR, txG, txB, 1)
                 end
             end
         end
@@ -1213,32 +1258,8 @@ initFrame:SetScript("OnEvent", function(self)
             cbBg:SetColorTexture(0, 0, 0, 0.5)
             UnsnapTex(cbBg)
 
-            -- 1px black borders on left, right, bottom (matching real CreateCastBar)
-            local cbBdrL = castbar:CreateTexture(nil, "OVERLAY")
-            cbBdrL:SetColorTexture(0, 0, 0, 1)
-            PP.Width(cbBdrL, 1)
-            PP.Point(cbBdrL, "TOPLEFT", castbar, "TOPLEFT", 0, 0)
-            PP.Point(cbBdrL, "BOTTOMLEFT", castbar, "BOTTOMLEFT", 0, 0)
-            UnsnapTex(cbBdrL)
-
-            local cbBdrR = castbar:CreateTexture(nil, "OVERLAY")
-            cbBdrR:SetColorTexture(0, 0, 0, 1)
-            PP.Width(cbBdrR, 1)
-            PP.Point(cbBdrR, "TOPRIGHT", castbar, "TOPRIGHT", 0, 0)
-            PP.Point(cbBdrR, "BOTTOMRIGHT", castbar, "BOTTOMRIGHT", 0, 0)
-            UnsnapTex(cbBdrR)
-
-            local cbBdrB = castbar:CreateTexture(nil, "OVERLAY")
-            cbBdrB:SetColorTexture(0, 0, 0, 1)
-            PP.Height(cbBdrB, 1)
-            PP.Point(cbBdrB, "BOTTOMLEFT", castbar, "BOTTOMLEFT", 0, 0)
-            PP.Point(cbBdrB, "BOTTOMRIGHT", castbar, "BOTTOMRIGHT", 0, 0)
-            UnsnapTex(cbBdrB)
-
-            -- Store castbar border refs for scale compensation
-            castbar._cbBdrL = cbBdrL
-            castbar._cbBdrR = cbBdrR
-            castbar._cbBdrB = cbBdrB
+            -- Black borders via unified PP system
+            PP.CreateBorder(castbar, 0, 0, 0, 1, 1, "OVERLAY", 0)
 
             -- Cast fill (inset 1px from left, 1px from bottom to sit inside borders)
             castFill = castbar:CreateTexture(nil, "ARTWORK")
@@ -1285,17 +1306,8 @@ initFrame:SetScript("OnEvent", function(self)
             iconBg:SetAllPoints()
             iconBg:SetColorTexture(0, 0, 0, 1)
             UnsnapTex(iconBg)
-            -- 1px black border edges
-            local function MkIconBdr()
-                local t = castIconFrame:CreateTexture(nil, "OVERLAY", nil, 7)
-                t:SetColorTexture(0, 0, 0, 1)
-                UnsnapTex(t)
-                return t
-            end
-            local ibT = MkIconBdr(); PP.Height(ibT, 1); PP.Point(ibT, "TOPLEFT", castIconFrame, "TOPLEFT", 0, 0); PP.Point(ibT, "TOPRIGHT", castIconFrame, "TOPRIGHT", 0, 0)
-            local ibB = MkIconBdr(); PP.Height(ibB, 1); PP.Point(ibB, "BOTTOMLEFT", castIconFrame, "BOTTOMLEFT", 0, 0); PP.Point(ibB, "BOTTOMRIGHT", castIconFrame, "BOTTOMRIGHT", 0, 0)
-            local ibL = MkIconBdr(); PP.Width(ibL, 1); PP.Point(ibL, "TOPLEFT", castIconFrame, "TOPLEFT", 0, 0); PP.Point(ibL, "BOTTOMLEFT", castIconFrame, "BOTTOMLEFT", 0, 0)
-            local ibR = MkIconBdr(); PP.Width(ibR, 1); PP.Point(ibR, "TOPRIGHT", castIconFrame, "TOPRIGHT", 0, 0); PP.Point(ibR, "BOTTOMRIGHT", castIconFrame, "BOTTOMRIGHT", 0, 0)
+            -- 1px black border via unified PP system
+            PP.CreateBorder(castIconFrame, 0, 0, 0, 1)
             local castIconTex = castIconFrame:CreateTexture(nil, "ARTWORK")
             PP.Point(castIconTex, "TOPLEFT", castIconFrame, "TOPLEFT", 1, -1)
             PP.Point(castIconTex, "BOTTOMRIGHT", castIconFrame, "BOTTOMRIGHT", -1, 1)
@@ -1303,7 +1315,6 @@ initFrame:SetScript("OnEvent", function(self)
             castIconTex:SetTexture(castSpellIcon)
             UnsnapTex(castIconTex)
             castIconFrame._iconTex = castIconTex
-            castIconFrame._iconBdrs = { ibT, ibB, ibL, ibR }
 
             -- Hide initially if player castbar not enabled
             if unitKey == "player" and castbarH <= 0 then
@@ -1526,7 +1537,7 @@ initFrame:SetScript("OnEvent", function(self)
             -- 1px inset bottom border for "above" position (matches frame border color)
             -- Sublevel 7 so it renders over pip fill textures (sublevel 3)
             local cpBottomBdr = cpPipContainer:CreateTexture(nil, "OVERLAY", nil, 7)
-            PP.Height(cpBottomBdr, 1)
+            cpBottomBdr:SetHeight(1)
             PP.Point(cpBottomBdr, "BOTTOMLEFT", cpPipContainer, "BOTTOMLEFT", 0, 0)
             PP.Point(cpBottomBdr, "BOTTOMRIGHT", cpPipContainer, "BOTTOMRIGHT", 0, 0)
             UnsnapTex(cpBottomBdr)
@@ -1549,29 +1560,7 @@ initFrame:SetScript("OnEvent", function(self)
         local initBdrBtbAtt = (initBdrBtbPos == "top" or initBdrBtbPos == "bottom")
         border:SetHeight(settings.healthHeight + initPpExtra + (settings.bottomTextBar and initBdrBtbAtt and (settings.bottomTextBarHeight or 16) or 0))
         border:SetFrameLevel(barArea:GetFrameLevel() + 5)
-        local function MkBdrTex()
-            local t = border:CreateTexture(nil, "OVERLAY", nil, 7)
-            t:SetColorTexture(bdrColor.r, bdrColor.g, bdrColor.b, 1)
-            UnsnapTex(t)
-            return t
-        end
-        local bdrT = MkBdrTex()
-        PP.Height(bdrT, bdrSize)
-        PP.Point(bdrT, "TOPLEFT",  border, "TOPLEFT",  0, 0)
-        PP.Point(bdrT, "TOPRIGHT", border, "TOPRIGHT", 0, 0)
-        local bdrB = MkBdrTex()
-        PP.Height(bdrB, bdrSize)
-        PP.Point(bdrB, "BOTTOMLEFT",  border, "BOTTOMLEFT",  0, 0)
-        PP.Point(bdrB, "BOTTOMRIGHT", border, "BOTTOMRIGHT", 0, 0)
-        local bdrL = MkBdrTex()
-        PP.Width(bdrL, bdrSize)
-        PP.Point(bdrL, "TOPLEFT",    border, "TOPLEFT",    0, 0)
-        PP.Point(bdrL, "BOTTOMLEFT", border, "BOTTOMLEFT", 0, 0)
-        local bdrR = MkBdrTex()
-        PP.Width(bdrR, bdrSize)
-        PP.Point(bdrR, "TOPRIGHT",    border, "TOPRIGHT",    0, 0)
-        PP.Point(bdrR, "BOTTOMRIGHT", border, "BOTTOMRIGHT", 0, 0)
-        border._texs = { bdrT, bdrB, bdrL, bdrR }
+        PP.CreateBorder(border, bdrColor.r, bdrColor.g, bdrColor.b, 1, bdrSize)
         if bdrSize == 0 then border:Hide() end
 
         -- Absorb bar (player only, uses shield.tga like the real addon)
@@ -1802,13 +1791,16 @@ initFrame:SetScript("OnEvent", function(self)
             -- Live-update dark mode colors
             do
                 local isDark = db.profile.darkTheme
-                local uHR, uHG, uHB, uHA, uBgR, uBgG, uBgB, uBgA
+                local uHR, uHG, uHB, uBgR, uBgG, uBgB
                 if isDark then
-                    uHR, uHG, uHB, uHA = 0x11/255, 0x11/255, 0x11/255, 0.90
-                    uBgR, uBgG, uBgB, uBgA = 0x4f/255, 0x4f/255, 0x4f/255, 1
+                    uHR, uHG, uHB = 0x11/255, 0x11/255, 0x11/255
+                    uBgR, uBgG, uBgB = 0x4f/255, 0x4f/255, 0x4f/255
                 else
-                    uHA = 1
-                    if unitKey == "player" then
+                    -- Check for custom fill color
+                    local cFill = s.customFillColor
+                    if cFill then
+                        uHR, uHG, uHB = cFill.r, cFill.g, cFill.b
+                    elseif unitKey == "player" then
                         local _, ct = UnitClass("player")
                         local cc = RAID_CLASS_COLORS[ct]
                         if cc then uHR, uHG, uHB = cc.r, cc.g, cc.b
@@ -1818,9 +1810,15 @@ initFrame:SetScript("OnEvent", function(self)
                     else
                         uHR, uHG, uHB = 0.8, 0.2, 0.2
                     end
-                    uBgR, uBgG, uBgB, uBgA = uHR * 0.2, uHG * 0.2, uHB * 0.2, 0.75
+                    -- Check for custom background color
+                    local cBg = s.customBgColor
+                    if cBg then
+                        uBgR, uBgG, uBgB = cBg.r, cBg.g, cBg.b
+                    else
+                        uBgR, uBgG, uBgB = uHR * 0.2, uHG * 0.2, uHB * 0.2
+                    end
                 end
-                healthFill:SetColorTexture(uHR, uHG, uHB, uHA)
+                healthFill:SetColorTexture(uHR, uHG, uHB, 1)
                 if isDark then
                     healthBgColor:ClearAllPoints()
                     healthBgColor:SetPoint("TOPLEFT", health, "TOPLEFT", math.floor(fw * (_previewHealthPct or 0.70) + 0.5), 0)
@@ -1829,7 +1827,7 @@ initFrame:SetScript("OnEvent", function(self)
                     healthBgColor:ClearAllPoints()
                     healthBgColor:SetAllPoints(health)
                 end
-                healthBgColor:SetColorTexture(uBgR, uBgG, uBgB, uBgA)
+                healthBgColor:SetColorTexture(uBgR, uBgG, uBgB, 1)
                 -- Update bar texture on fill textures
                 do
                     local curTexKey = s.healthBarTexture or db.profile.healthBarTexture or "none"
@@ -1844,20 +1842,34 @@ initFrame:SetScript("OnEvent", function(self)
                         end
                     end
                     if pf._powerFill then
+                        local cpf2 = s.customPowerFillColor
+                        local pvFR, pvFG, pvFB = 0.2, 0.35, 0.85
+                        if cpf2 then pvFR, pvFG, pvFB = cpf2.r, cpf2.g, cpf2.b end
                         if curTexPath then
                             pf._powerFill:SetTexture(curTexPath)
-                            pf._powerFill:SetVertexColor(0.2, 0.35, 0.85, 1)
+                            pf._powerFill:SetVertexColor(pvFR, pvFG, pvFB, 1)
                         else
                             pf._powerFill:SetVertexColor(1, 1, 1, 1)
-                            pf._powerFill:SetColorTexture(0.2, 0.35, 0.85, 1)
+                            pf._powerFill:SetColorTexture(pvFR, pvFG, pvFB, 1)
                         end
                     end
                 end
 
-                -- Apply health bar opacity (fill + bg only, not text)
-                local hbOpacity = s.healthBarOpacity or db.profile.healthBarOpacity or 0.9
-                if healthFill then healthFill:SetAlpha(hbOpacity) end
-                if healthBgColor then healthBgColor:SetAlpha(hbOpacity) end
+                -- Apply health bar alpha from custom color tables
+                local hFillA, hBgA
+                if isDark then
+                    hFillA = 0.90
+                    hBgA   = 1
+                else
+                    hFillA = 0.9
+                    hBgA   = 0.75
+                    local hcf = s.customFillColor
+                    if hcf and hcf.a then hFillA = hcf.a end
+                    local hcb = s.customBgColor
+                    if hcb and hcb.a then hBgA = hcb.a end
+                end
+                if healthFill then healthFill:SetAlpha(hFillA) end
+                if healthBgColor then healthBgColor:SetAlpha(hBgA) end
             end
 
             -- Update text via unified function
@@ -1893,10 +1905,24 @@ initFrame:SetScript("OnEvent", function(self)
                     PP.Width(pf._powerFill, math.floor(pvPw * (_previewPowerPct or 0.85) + 0.5))
                 end
 
-                -- Apply power bar opacity (fill + bg only, not text)
-                local pbOpacity = s.powerBarOpacity or db.profile.powerBarOpacity or 1.0
-                if pf._powerFill then pf._powerFill:SetAlpha(pbOpacity) end
-                if pf._powerBg then pf._powerBg:SetAlpha(pbOpacity) end
+                -- Apply power bar alpha from custom color tables
+                local pFillA = 1.0
+                local pBgA   = 0.5
+                local cpFill = s.customPowerFillColor
+                local cpBg = s.customPowerBgColor
+                if cpFill and cpFill.a then pFillA = cpFill.a end
+                if cpBg and cpBg.a then pBgA = cpBg.a end
+                if pf._powerFill then pf._powerFill:SetAlpha(pFillA) end
+                if pf._powerBg then pf._powerBg:SetAlpha(pBgA) end
+
+                -- Apply custom power bar colors
+                local pvPfR, pvPfG, pvPfB = 0.2, 0.35, 0.85
+                local pvPbR, pvPbG, pvPbB = pvPfR * 0.3, pvPfG * 0.3, pvPfB * 0.3
+                if cpFill then pvPfR, pvPfG, pvPfB = cpFill.r, cpFill.g, cpFill.b end
+                if cpBg then pvPbR, pvPbG, pvPbB = cpBg.r, cpBg.g, cpBg.b
+                else pvPbR, pvPbG, pvPbB = pvPfR * 0.3, pvPfG * 0.3, pvPfB * 0.3 end
+                if pf._powerFill then pf._powerFill:SetColorTexture(pvPfR, pvPfG, pvPfB, 1) end
+                if pf._powerBg then pf._powerBg:SetColorTexture(pvPbR, pvPbG, pvPbB, 1) end
             end
 
             -- Power percent text in preview
@@ -1923,7 +1949,12 @@ initFrame:SetScript("OnEvent", function(self)
                     if s.powerPercentPowerColor then
                         ppPreviewFS:SetTextColor(0.2, 0.35, 0.85)
                     else
-                        ppPreviewFS:SetTextColor(1, 1, 1)
+                        local ptc = s.powerTextColor
+                        if ptc then
+                            ppPreviewFS:SetTextColor(ptc.r, ptc.g, ptc.b)
+                        else
+                            ppPreviewFS:SetTextColor(1, 1, 1)
+                        end
                     end
                     ppPreviewFS:Show()
                 else
@@ -2058,15 +2089,7 @@ initFrame:SetScript("OnEvent", function(self)
             border:SetPoint("TOPRIGHT", barArea, "TOPRIGHT", 0, 0)
             border:SetHeight(borderH)
             if bs > 0 then
-                if border._texs then
-                    for _, t in ipairs(border._texs) do
-                        t:SetColorTexture(bc.r, bc.g, bc.b, 1)
-                    end
-                    PP.Height(border._texs[1], bs)
-                    PP.Height(border._texs[2], bs)
-                    PP.Width(border._texs[3], bs)
-                    PP.Width(border._texs[4], bs)
-                end
+                PP.UpdateBorder(border, bs, bc.r, bc.g, bc.b, 1)
                 border:Show()
             else
                 border:Hide()
@@ -2302,28 +2325,20 @@ initFrame:SetScript("OnEvent", function(self)
             pf:SetScale(combinedScale)
 
             -- Recalculate border sizes after scale change so they stay pixel-perfect
-            if border and border._texs then
+            if border then
                 local bs2 = ds.borderSize or 1
-                PP.Height(border._texs[1], bs2)
-                PP.Height(border._texs[2], bs2)
-                PP.Width(border._texs[3], bs2)
-                PP.Width(border._texs[4], bs2)
+                PP.SetBorderSize(border, bs2)
             end
             if castbar then
-                if castbar._cbBdrL then PP.Width(castbar._cbBdrL, 1) end
-                if castbar._cbBdrR then PP.Width(castbar._cbBdrR, 1) end
-                if castbar._cbBdrB then PP.Height(castbar._cbBdrB, 1) end
+                if castbar._ppBorders then PP.SetBorderSize(castbar, 1) end
                 if castFill then
                     castFill:ClearAllPoints()
                     PP.Point(castFill, "TOPLEFT", castbar, "TOPLEFT", 1, 0)
                     PP.Point(castFill, "BOTTOMLEFT", castbar, "BOTTOMLEFT", 1, 1)
                 end
             end
-            if castIconFrame and castIconFrame._iconBdrs then
-                PP.Height(castIconFrame._iconBdrs[1], 1)
-                PP.Height(castIconFrame._iconBdrs[2], 1)
-                PP.Width(castIconFrame._iconBdrs[3], 1)
-                PP.Width(castIconFrame._iconBdrs[4], 1)
+            if castIconFrame then
+                PP.SetBorderSize(castIconFrame, 1)
                 if castIconFrame._iconTex then
                     castIconFrame._iconTex:ClearAllPoints()
                     PP.Point(castIconFrame._iconTex, "TOPLEFT", castIconFrame, "TOPLEFT", 1, -1)
@@ -3121,6 +3136,7 @@ initFrame:SetScript("OnEvent", function(self)
               setValue=function(v)
                   db.profile.darkTheme = v
                   ReloadAndUpdate(); UpdateMultiPreview()
+                  EllesmereUI:RefreshPage()
               end },
             { type="dropdown", text="Bar Texture", values=hbtValues, order=hbtOrder,
               getValue=function() return SVal("healthBarTexture", "none") end,
@@ -3148,7 +3164,7 @@ initFrame:SetScript("OnEvent", function(self)
                   end
                   ReloadAndUpdate()
               end },
-            nil);  y = y - h
+            { type="label", text="" });  y = y - h
         SWrap(sharedBorderRow._leftRegion, "borderColor")
         -- Inline cog on Border Color for Highlight Color + Border Size
         do
@@ -3456,21 +3472,52 @@ initFrame:SetScript("OnEvent", function(self)
         SWrap(sharedSizeRow._leftRegion, "healthHeight")
         SWrap(sharedSizeRow._rightRegion, "frameWidth")
 
-        -- Row 2: Bar Opacity + Center Text
-        local sharedOpacityCenterRow
-        sharedOpacityCenterRow, h = W:DualRow(parent, y,
-            { type="slider", text="Bar Opacity", min=0, max=100, step=1,
-              getValue=function() return (SVal("healthBarOpacity", 0.9)) * 100 end,
-              setValue=function(v)
-                  if isMulti then
-                      for _, key in ipairs(GROUP_UNIT_ORDER) do
-                          if groupChecked[key] then UNIT_DB_MAP[key]().healthBarOpacity = v / 100 end
+        -- Row 2: Health Color (multiSwatch with alpha) + Center Text
+        local sharedHealthColorRow
+        sharedHealthColorRow, h = W:DualRow(parent, y,
+            { type="multiSwatch", text="Health Color",
+              swatches = {
+                { tooltip = "Background", hasAlpha = true,
+                  getValue = function()
+                      local c = SGet("customBgColor")
+                      if c == MIXED then c = SDB().customBgColor end
+                      if c then return c.r, c.g, c.b, c.a or 0.75 end
+                      local _, ct = UnitClass("player")
+                      local cc = ct and RAID_CLASS_COLORS[ct]
+                      if cc then return cc.r * 0.2, cc.g * 0.2, cc.b * 0.2, 0.75 end
+                      return 0.04, 0.12, 0.04, 0.75
+                  end,
+                  setValue = function(r, g, b, a)
+                      if isMulti then
+                          for _, key in ipairs(GROUP_UNIT_ORDER) do
+                              if groupChecked[key] then UNIT_DB_MAP[key]().customBgColor = { r=r, g=g, b=b, a=a } end
+                          end
+                      else
+                          UNIT_DB_MAP[selectedUnit]().customBgColor = { r=r, g=g, b=b, a=a }
                       end
-                  else
-                      UNIT_DB_MAP[selectedUnit]().healthBarOpacity = v / 100
-                  end
-                  ReloadAndUpdate(); UpdateMultiPreview()
-              end },
+                      ReloadAndUpdate(); UpdateMultiPreview()
+                  end },
+                { tooltip = "Fill", hasAlpha = true,
+                  getValue = function()
+                      local c = SGet("customFillColor")
+                      if c == MIXED then c = SDB().customFillColor end
+                      if c then return c.r, c.g, c.b, c.a or 0.9 end
+                      local _, ct = UnitClass("player")
+                      local cc = ct and RAID_CLASS_COLORS[ct]
+                      if cc then return cc.r, cc.g, cc.b, 0.9 end
+                      return 0.2, 0.6, 0.2, 0.9
+                  end,
+                  setValue = function(r, g, b, a)
+                      if isMulti then
+                          for _, key in ipairs(GROUP_UNIT_ORDER) do
+                              if groupChecked[key] then UNIT_DB_MAP[key]().customFillColor = { r=r, g=g, b=b, a=a } end
+                          end
+                      else
+                          UNIT_DB_MAP[selectedUnit]().customFillColor = { r=r, g=g, b=b, a=a }
+                      end
+                      ReloadAndUpdate(); UpdateMultiPreview()
+                  end },
+              } },
             { type="dropdown", text="Center Text", values=healthTextValues, order=healthTextOrder,
               getValue=function() return SVal("centerTextContent", "none") end,
               setValue=function(v)
@@ -3481,12 +3528,37 @@ initFrame:SetScript("OnEvent", function(self)
                   end
                   ReloadAndUpdate(); UpdateMultiPreview()
               end });  y = y - h
-        SWrap(sharedOpacityCenterRow._leftRegion, "healthBarOpacity")
-        SWrap(sharedOpacityCenterRow._rightRegion, "centerTextContent")
-        local sharedCenterTextRow = sharedOpacityCenterRow
+        SWrap(sharedHealthColorRow._leftRegion, "customFillColor")
+        SWrap(sharedHealthColorRow._rightRegion, "centerTextContent")
+        -- Disabled overlay on Health Color when Dark Mode is ON
+        do
+            local leftRgn = sharedHealthColorRow._leftRegion
+            local block = CreateFrame("Frame", nil, leftRgn)
+            block:SetAllPoints()
+            block:SetFrameLevel(leftRgn:GetFrameLevel() + 10)
+            block:EnableMouse(true)
+            block:SetScript("OnEnter", function()
+                EllesmereUI.ShowWidgetTooltip(leftRgn, EllesmereUI.DisabledTooltip("Dark Mode"))
+            end)
+            block:SetScript("OnLeave", function() EllesmereUI.HideWidgetTooltip() end)
+            EllesmereUI.RegisterWidgetRefresh(function()
+                local isDark = db.profile.darkTheme
+                if isDark then
+                    block:Show()
+                    leftRgn:SetAlpha(0.3)
+                else
+                    block:Hide()
+                    leftRgn:SetAlpha(1)
+                end
+            end)
+            local isDark = db.profile.darkTheme
+            if isDark then block:Show(); leftRgn:SetAlpha(0.3)
+            else block:Hide(); leftRgn:SetAlpha(1) end
+        end
+        local sharedCenterTextRow = sharedHealthColorRow
         -- Cogwheel on Center Text
         do
-            local ctrRgn = sharedOpacityCenterRow._rightRegion
+            local ctrRgn = sharedHealthColorRow._rightRegion
             local _, centerCogShowRaw = EllesmereUI.BuildCogPopup({
                 title = "Center Text Settings",
                 rows = {
@@ -3685,26 +3757,14 @@ initFrame:SetScript("OnEvent", function(self)
             RegisterWidgetRefresh(_ppPosCogUpdate)
         end
 
-        -- Row 2: Text + Bar Opacity
+        -- Row 2: Text
         local sharedPowerRow2
         sharedPowerRow2, h = W:DualRow(parent, y,
             { type="dropdown", text="Text", values=ppTextValues, order=ppTextOrder,
               getValue=function() return SVal("powerPercentText", "none") end,
               setValue=function(v) SSet("powerPercentText", v); ReloadAndUpdate(); UpdateMultiPreview() end },
-            { type="slider", text="Bar Opacity", min=0, max=100, step=1,
-              getValue=function() return (SVal("powerBarOpacity", 1.0)) * 100 end,
-              setValue=function(v)
-                  if isMulti then
-                      for _, key in ipairs(GROUP_UNIT_ORDER) do
-                          if groupChecked[key] then UNIT_DB_MAP[key]().powerBarOpacity = v / 100 end
-                      end
-                  else
-                      UNIT_DB_MAP[selectedUnit]().powerBarOpacity = v / 100
-                  end
-                  ReloadAndUpdate(); UpdateMultiPreview()
-              end });  y = y - h
+            { type="label", text="" });  y = y - h
         SWrap(sharedPowerRow2._leftRegion, "powerPercentText")
-        SWrap(sharedPowerRow2._rightRegion, "powerBarOpacity")
         -- Cogwheel on Power Bar Text
         do
             local ppRgn = sharedPowerRow2._leftRegion
@@ -3720,12 +3780,9 @@ initFrame:SetScript("OnEvent", function(self)
                     { type="slider", label="Y Offset", min=-50, max=50, step=1,
                       get=function() return SVal("powerPercentY", 0) end,
                       set=function(v) SSet("powerPercentY", v); ReloadAndUpdate(); UpdateMultiPreview() end },
-                    { type="toggle", label="Power Color",
-                      get=function() return SVal("powerPercentPowerColor", false) end,
-                      set=function(v) SSet("powerPercentPowerColor", v); ReloadAndUpdate(); UpdateMultiPreview() end },
                 },
             })
-            local ppCogShow = SWrapCog(ppCogShowRaw, {"powerPercentSize","powerPercentX","powerPercentY","powerPercentPowerColor"})
+            local ppCogShow = SWrapCog(ppCogShowRaw, {"powerPercentSize","powerPercentX","powerPercentY"})
             local ppCogBtn = MakeCogBtn(ppRgn, ppCogShow)
             local function UpdatePPCogState()
                 local isNone = SVal("powerPercentText", "none") == "none"
@@ -3741,6 +3798,107 @@ initFrame:SetScript("OnEvent", function(self)
             ppCogBtn:SetScript("OnClick", function(self) ppCogShow(self) end)
             UpdatePPCogState()
             RegisterWidgetRefresh(UpdatePPCogState)
+        end
+
+        -- Row 3: Bar Color (multiSwatch with alpha) + Power Colored (toggle with inline swatch)
+        local sharedPowerRow3
+        sharedPowerRow3, h = W:DualRow(parent, y,
+            { type="multiSwatch", text="Bar Color",
+              swatches = {
+                { tooltip = "Background", hasAlpha = true,
+                  getValue = function()
+                      local c = SGet("customPowerBgColor")
+                      if c == MIXED then c = SDB().customPowerBgColor end
+                      if c then return c.r, c.g, c.b, c.a or 0.5 end
+                      return 0, 0, 0, 0.5
+                  end,
+                  setValue = function(r, g, b, a)
+                      if isMulti then
+                          for _, key in ipairs(GROUP_UNIT_ORDER) do
+                              if groupChecked[key] then UNIT_DB_MAP[key]().customPowerBgColor = { r=r, g=g, b=b, a=a } end
+                          end
+                      else
+                          UNIT_DB_MAP[selectedUnit]().customPowerBgColor = { r=r, g=g, b=b, a=a }
+                      end
+                      ReloadAndUpdate(); UpdateMultiPreview()
+                  end },
+                { tooltip = "Fill", hasAlpha = true,
+                  getValue = function()
+                      local c = SGet("customPowerFillColor")
+                      if c == MIXED then c = SDB().customPowerFillColor end
+                      if c then return c.r, c.g, c.b, c.a or 1.0 end
+                      -- Default: power type color
+                      local pType = UnitPowerType("player")
+                      local info = PowerBarColor[pType]
+                      if info then return info.r, info.g, info.b, 1.0 end
+                      return 0.2, 0.35, 0.85, 1.0
+                  end,
+                  setValue = function(r, g, b, a)
+                      if isMulti then
+                          for _, key in ipairs(GROUP_UNIT_ORDER) do
+                              if groupChecked[key] then UNIT_DB_MAP[key]().customPowerFillColor = { r=r, g=g, b=b, a=a } end
+                          end
+                      else
+                          UNIT_DB_MAP[selectedUnit]().customPowerFillColor = { r=r, g=g, b=b, a=a }
+                      end
+                      ReloadAndUpdate(); UpdateMultiPreview()
+                  end },
+              } },
+            { type="toggle", text="Power Colored",
+              getValue=function() return SVal("powerPercentPowerColor", true) end,
+              setValue=function(v)
+                  SSet("powerPercentPowerColor", v)
+                  ReloadAndUpdate(); UpdateMultiPreview()
+                  EllesmereUI:RefreshPage()
+              end });  y = y - h
+        SWrap(sharedPowerRow3._leftRegion, "customPowerFillColor")
+        SWrap(sharedPowerRow3._rightRegion, "powerPercentPowerColor")
+        -- Inline color swatch on Power Colored for custom text color
+        do
+            local rgn = sharedPowerRow3._rightRegion
+            local swatch, updateSwatch = EllesmereUI.BuildColorSwatch(rgn, rgn:GetFrameLevel() + 5,
+                function()
+                    local c = SGet("powerTextColor")
+                    if c == MIXED then c = SDB().powerTextColor end
+                    if c then return c.r, c.g, c.b end
+                    return 1, 1, 1
+                end,
+                function(r, g, b)
+                    if isMulti then
+                        for _, key in ipairs(GROUP_UNIT_ORDER) do
+                            if groupChecked[key] then UNIT_DB_MAP[key]().powerTextColor = { r=r, g=g, b=b } end
+                        end
+                    else
+                        UNIT_DB_MAP[selectedUnit]().powerTextColor = { r=r, g=g, b=b }
+                    end
+                    ReloadAndUpdate(); UpdateMultiPreview()
+                end, false, 20)
+            PP.Point(swatch, "RIGHT", rgn._lastInline or rgn._control, "LEFT", -12, 0)
+            rgn._lastInline = swatch
+
+            -- Disabled overlay when Power Colored is ON
+            local swatchBlock = CreateFrame("Frame", nil, swatch)
+            swatchBlock:SetAllPoints()
+            swatchBlock:SetFrameLevel(swatch:GetFrameLevel() + 10)
+            swatchBlock:EnableMouse(true)
+            swatchBlock:SetScript("OnEnter", function()
+                EllesmereUI.ShowWidgetTooltip(swatch, EllesmereUI.DisabledTooltip("Power Colored"))
+            end)
+            swatchBlock:SetScript("OnLeave", function() EllesmereUI.HideWidgetTooltip() end)
+
+            local function UpdatePowerSwatchDisabled()
+                local isPowerColored = SVal("powerPercentPowerColor", true)
+                if isPowerColored then
+                    swatch:SetAlpha(0.3)
+                    swatchBlock:Show()
+                else
+                    swatch:SetAlpha(1)
+                    swatchBlock:Hide()
+                end
+                if updateSwatch then updateSwatch() end
+            end
+            UpdatePowerSwatchDisabled()
+            EllesmereUI.RegisterWidgetRefresh(UpdatePowerSwatchDisabled)
         end
 
         _, h = W:Spacer(parent, y, 20); y = y - h
@@ -5158,10 +5316,10 @@ initFrame:SetScript("OnEvent", function(self)
                 if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end
                 return t
             end
-            local ht = MkHL(); PP.Height(ht, 2); ht:SetPoint("TOPLEFT", hlAnchorFrame, "TOPLEFT"); ht:SetPoint("TOPRIGHT", hlAnchorFrame, "TOPRIGHT")
-            local hb = MkHL(); PP.Height(hb, 2); hb:SetPoint("BOTTOMLEFT", hlAnchorFrame, "BOTTOMLEFT"); hb:SetPoint("BOTTOMRIGHT", hlAnchorFrame, "BOTTOMRIGHT")
-            local hl = MkHL(); PP.Width(hl, 2); hl:SetPoint("TOPLEFT", ht, "BOTTOMLEFT"); hl:SetPoint("BOTTOMLEFT", hb, "TOPLEFT")
-            local hr = MkHL(); PP.Width(hr, 2); hr:SetPoint("TOPRIGHT", ht, "BOTTOMRIGHT"); hr:SetPoint("BOTTOMRIGHT", hb, "TOPRIGHT")
+            local ht = MkHL(); ht:SetHeight(2); ht:SetPoint("TOPLEFT", hlAnchorFrame, "TOPLEFT"); ht:SetPoint("TOPRIGHT", hlAnchorFrame, "TOPRIGHT")
+            local hb = MkHL(); hb:SetHeight(2); hb:SetPoint("BOTTOMLEFT", hlAnchorFrame, "BOTTOMLEFT"); hb:SetPoint("BOTTOMRIGHT", hlAnchorFrame, "BOTTOMRIGHT")
+            local hl = MkHL(); hl:SetWidth(2); hl:SetPoint("TOPLEFT", ht, "BOTTOMLEFT"); hl:SetPoint("BOTTOMLEFT", hb, "TOPLEFT")
+            local hr = MkHL(); hr:SetWidth(2); hr:SetPoint("TOPRIGHT", ht, "BOTTOMRIGHT"); hr:SetPoint("BOTTOMRIGHT", hb, "TOPRIGHT")
             btn._hlTextures = { ht, hb, hl, hr }
             local function ShowHL() for _, t in ipairs(btn._hlTextures) do t:Show() end end
             local function HideHL() for _, t in ipairs(btn._hlTextures) do t:Hide() end end
@@ -5455,10 +5613,10 @@ initFrame:SetScript("OnEvent", function(self)
                 if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end
                 return t
             end
-            local ht = MkHL(); PP.Height(ht, 2); ht:SetPoint("TOPLEFT", hlAnchorFrame, "TOPLEFT"); ht:SetPoint("TOPRIGHT", hlAnchorFrame, "TOPRIGHT")
-            local hb = MkHL(); PP.Height(hb, 2); hb:SetPoint("BOTTOMLEFT", hlAnchorFrame, "BOTTOMLEFT"); hb:SetPoint("BOTTOMRIGHT", hlAnchorFrame, "BOTTOMRIGHT")
-            local hl = MkHL(); PP.Width(hl, 2); hl:SetPoint("TOPLEFT", ht, "BOTTOMLEFT"); hl:SetPoint("BOTTOMLEFT", hb, "TOPLEFT")
-            local hr = MkHL(); PP.Width(hr, 2); hr:SetPoint("TOPRIGHT", ht, "BOTTOMRIGHT"); hr:SetPoint("BOTTOMRIGHT", hb, "TOPRIGHT")
+            local ht = MkHL(); ht:SetHeight(2); ht:SetPoint("TOPLEFT", hlAnchorFrame, "TOPLEFT"); ht:SetPoint("TOPRIGHT", hlAnchorFrame, "TOPRIGHT")
+            local hb = MkHL(); hb:SetHeight(2); hb:SetPoint("BOTTOMLEFT", hlAnchorFrame, "BOTTOMLEFT"); hb:SetPoint("BOTTOMRIGHT", hlAnchorFrame, "BOTTOMRIGHT")
+            local hl = MkHL(); hl:SetWidth(2); hl:SetPoint("TOPLEFT", ht, "BOTTOMLEFT"); hl:SetPoint("BOTTOMLEFT", hb, "TOPLEFT")
+            local hr = MkHL(); hr:SetWidth(2); hr:SetPoint("TOPRIGHT", ht, "BOTTOMRIGHT"); hr:SetPoint("BOTTOMRIGHT", hb, "TOPRIGHT")
             btn._hlTextures = { ht, hb, hl, hr }
             local function ShowHL() for _, t in ipairs(btn._hlTextures) do t:Show() end end
             local function HideHL() for _, t in ipairs(btn._hlTextures) do t:Hide() end end
@@ -5906,10 +6064,10 @@ initFrame:SetScript("OnEvent", function(self)
                 if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end
                 return t
             end
-            local ht = MkHL(); PP.Height(ht, 2); ht:SetPoint("TOPLEFT", hlAnchorFrame, "TOPLEFT"); ht:SetPoint("TOPRIGHT", hlAnchorFrame, "TOPRIGHT")
-            local hb = MkHL(); PP.Height(hb, 2); hb:SetPoint("BOTTOMLEFT", hlAnchorFrame, "BOTTOMLEFT"); hb:SetPoint("BOTTOMRIGHT", hlAnchorFrame, "BOTTOMRIGHT")
-            local hl = MkHL(); PP.Width(hl, 2); hl:SetPoint("TOPLEFT", ht, "BOTTOMLEFT"); hl:SetPoint("BOTTOMLEFT", hb, "TOPLEFT")
-            local hr = MkHL(); PP.Width(hr, 2); hr:SetPoint("TOPRIGHT", ht, "BOTTOMRIGHT"); hr:SetPoint("BOTTOMRIGHT", hb, "TOPRIGHT")
+            local ht = MkHL(); ht:SetHeight(2); ht:SetPoint("TOPLEFT", hlAnchorFrame, "TOPLEFT"); ht:SetPoint("TOPRIGHT", hlAnchorFrame, "TOPRIGHT")
+            local hb = MkHL(); hb:SetHeight(2); hb:SetPoint("BOTTOMLEFT", hlAnchorFrame, "BOTTOMLEFT"); hb:SetPoint("BOTTOMRIGHT", hlAnchorFrame, "BOTTOMRIGHT")
+            local hl = MkHL(); hl:SetWidth(2); hl:SetPoint("TOPLEFT", ht, "BOTTOMLEFT"); hl:SetPoint("BOTTOMLEFT", hb, "TOPLEFT")
+            local hr = MkHL(); hr:SetWidth(2); hr:SetPoint("TOPRIGHT", ht, "BOTTOMRIGHT"); hr:SetPoint("BOTTOMRIGHT", hb, "TOPRIGHT")
             btn._hlTextures = { ht, hb, hl, hr }
             local function ShowHL() for _, t in ipairs(btn._hlTextures) do t:Show() end end
             local function HideHL() for _, t in ipairs(btn._hlTextures) do t:Hide() end end

@@ -6,6 +6,112 @@
 -------------------------------------------------------------------------------
 local ADDON_NAME = ...
 
+-------------------------------------------------------------------------------
+--  Pixel-Perfect UI Scale
+--
+--  SavedVariables (EllesmereUIDB) aren't available at file scope — they load
+--  at ADDON_LOADED. So we use events:
+--    ADDON_LOADED  → DB is available. If we have a saved scale, apply it.
+--                    If migrating from old system, convert and apply.
+--    PLAYER_ENTERING_WORLD → Blizzard has applied the user's CVar scale.
+--                    If no saved scale yet (first install / reset), snapshot
+--                    the user's current Blizzard scale and save it.
+-------------------------------------------------------------------------------
+do
+    local GetPhysicalScreenSize = GetPhysicalScreenSize
+    local dbReady = false
+
+    local pendingScale = nil   -- scale to apply once the world is ready
+
+    local function ApplyScaleSafe(scale)
+        if InCombatLockdown() then
+            -- Defer until combat ends — UIParent:SetScale is protected in combat
+            local f = CreateFrame("Frame")
+            f:RegisterEvent("PLAYER_REGEN_ENABLED")
+            f:SetScript("OnEvent", function(self)
+                self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+                UIParent:SetScale(scale)
+            end)
+        else
+            UIParent:SetScale(scale)
+        end
+    end
+
+    local scaleFrame = CreateFrame("Frame")
+    scaleFrame:RegisterEvent("ADDON_LOADED")
+    scaleFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    scaleFrame:SetScript("OnEvent", function(self, event, addonName)
+        if event == "ADDON_LOADED" then
+            if addonName ~= ADDON_NAME then return end
+            self:UnregisterEvent("ADDON_LOADED")
+            dbReady = true
+
+            if not EllesmereUIDB then EllesmereUIDB = {} end
+
+            local _, physH = GetPhysicalScreenSize()
+            local perfect = 768 / physH
+            local function PixelBestSize()
+                return max(0.4, min(perfect, 1.15))
+            end
+
+            -- Migration from old percentage-based blizzUIScale
+            if EllesmereUIDB.ppUIScale == nil and EllesmereUIDB.blizzUIScale then
+                EllesmereUIDB.ppUIScale = PixelBestSize()
+                EllesmereUIDB.ppUIScaleAuto = true
+            end
+
+            -- Apply saved scale immediately for non-migration cases
+            -- (returning users who already have ppUIScale set)
+            if EllesmereUIDB.ppUIScale then
+                pendingScale = EllesmereUIDB.ppUIScale
+                ApplyScaleSafe(pendingScale)
+            end
+
+        elseif event == "PLAYER_ENTERING_WORLD" then
+            self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+
+            -- If ADDON_LOADED hasn't fired yet (shouldn't happen, but safety)
+            if not dbReady then return end
+            if not EllesmereUIDB then EllesmereUIDB = {} end
+
+            -- First install or reset: snapshot the user's Blizzard scale
+            if EllesmereUIDB.ppUIScale == nil then
+                local blizzScale = UIParent:GetScale()
+                local clamped = max(0.4, min(blizzScale, 1.15))
+                EllesmereUIDB.ppUIScale = clamped
+                EllesmereUIDB.ppUIScaleAuto = false
+                pendingScale = clamped
+            end
+
+            -- Re-apply scale now that the world is loaded, then again
+            -- after a short delay to beat any Blizzard resets
+            local scale = EllesmereUIDB.ppUIScale
+            if scale then
+                ApplyScaleSafe(scale)
+                C_Timer.After(1, function()
+                    if InCombatLockdown() then return end
+                    if EllesmereUIDB and EllesmereUIDB.ppUIScale then
+                        ApplyScaleSafe(EllesmereUIDB.ppUIScale)
+                    end
+                    -- Re-snap all borders unconditionally. UI_SCALE_CHANGED only
+                    -- fires when the scale value actually changes, so if the scale
+                    -- is already correct the event never fires and borders that
+                    -- were created after the last scale change never get re-snapped.
+                    if EllesmereUI and EllesmereUI.PP and EllesmereUI.PP.ResnapAllBorders then
+                        EllesmereUI.PP.ResnapAllBorders()
+                    end
+                end)
+                -- Second pass: catch any borders created late (e.g. lazy-init frames)
+                C_Timer.After(3, function()
+                    if EllesmereUI and EllesmereUI.PP and EllesmereUI.PP.ResnapAllBorders then
+                        EllesmereUI.PP.ResnapAllBorders()
+                    end
+                end)
+            end
+        end
+    end)
+end
+
 -- Apply the saved combat text font immediately at file scope.
 -- DAMAGE_TEXT_FONT must be set before the engine caches it at login.
 -- CombatTextFont may not exist yet here, so we also hook ADDON_LOADED
