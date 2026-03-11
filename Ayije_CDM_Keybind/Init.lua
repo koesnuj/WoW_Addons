@@ -144,6 +144,19 @@ local function RefreshKeybindsDelayed(delay)
     C_Timer.After(delay or 0.3, RefreshKeybinds)
 end
 
+-- Debounced refresh: coalesces rapid bursts of ACTIONBAR_SLOT_CHANGED
+-- (e.g. 16 slots firing at once when mousing over party frames) into one call.
+local _refreshPending = false
+local function RefreshKeybindsDebounced()
+    if not _refreshPending then
+        _refreshPending = true
+        C_Timer.After(0.15, function()
+            _refreshPending = false
+            RefreshKeybinds()
+        end)
+    end
+end
+
 eventFrame:RegisterEvent("UPDATE_BINDINGS")
 eventFrame:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 eventFrame:RegisterEvent("SPELLS_CHANGED")
@@ -154,7 +167,7 @@ eventFrame:RegisterEvent("ADDON_LOADED")
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "UPDATE_BINDINGS" or event == "ACTIONBAR_SLOT_CHANGED" then
-        RefreshKeybinds()
+        RefreshKeybindsDebounced()
     elseif event == "SPELLS_CHANGED" then
         RefreshKeybindsDelayed(0.1)
     elseif event == "UPDATE_SHAPESHIFT_FORM"

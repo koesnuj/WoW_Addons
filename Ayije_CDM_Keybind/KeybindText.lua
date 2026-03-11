@@ -274,7 +274,90 @@ local function GetKeybindForItem(itemID)
     return nil
 end
 
+-- =========================================================================
+--  KEYBIND CACHE (built once per refresh cycle, O(bars*buttons) total)
+-- =========================================================================
+
+local _spellCache = nil  -- {[spellID] = keybindText}
+local _itemCache  = nil  -- {[itemID]  = keybindText}
+
+local function BuildKeybindCache()
+    _spellCache = {}
+    _itemCache  = {}
+
+    for _, def in ipairs(BAR_DEFS) do
+        if IsBarActive(def) then
+            for i = 1, 12 do
+                local key = GetBindingKey(def.bind .. i)
+                if key then
+                    local abbrev = AbbreviateKeybind(key)
+                    local btnFrame = _G[def.frame .. i]
+                    if btnFrame then
+                        local action = GetButtonAction(btnFrame)
+                        if action and HasAction(action) then
+                            local actionType, id = GetActionInfo(action)
+                            if actionType == "spell" and id and not issecretvalue(id) then
+                                if not _spellCache[id] then
+                                    _spellCache[id] = abbrev
+                                    for vid in pairs(CollectSpellVariants(id)) do
+                                        _spellCache[vid] = _spellCache[vid] or abbrev
+                                    end
+                                end
+                            elseif actionType == "item" and id then
+                                _itemCache[id] = _itemCache[id] or abbrev
+                            elseif actionType == "macro" and id then
+                                if GetMacroSpell then
+                                    local macroSpellID = GetMacroSpell(id)
+                                    if macroSpellID and not issecretvalue(macroSpellID)
+                                        and not _spellCache[macroSpellID] then
+                                        _spellCache[macroSpellID] = abbrev
+                                        for vid in pairs(CollectSpellVariants(macroSpellID)) do
+                                            _spellCache[vid] = _spellCache[vid] or abbrev
+                                        end
+                                    end
+                                end
+                                if GetMacroItem then
+                                    local _, itemLink = GetMacroItem(id)
+                                    if itemLink then
+                                        local macroItemID = tonumber(itemLink:match("item:(%d+)"))
+                                        if macroItemID then
+                                            _itemCache[macroItemID] = _itemCache[macroItemID] or abbrev
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function WipeKeybindCache()
+    _spellCache = nil
+    _itemCache  = nil
+end
+
+-- Fast cache-based lookup (replaces the per-call full bar scan)
+local function GetKeybindForSpellCached(spellID)
+    if not spellID then return nil end
+    -- Secret IDs can't be table keys; fall back to API scan
+    if issecretvalue(spellID) then
+        return GetKeybindForSpell(spellID)
+    end
+    if not _spellCache then BuildKeybindCache() end
+    return _spellCache[spellID]
+end
+
+local function GetKeybindForItemCached(itemID)
+    if not itemID then return nil end
+    if not _itemCache then BuildKeybindCache() end
+    return _itemCache[itemID]
+end
+
 CDM.GetKeybindForSpell = GetKeybindForSpell
+CDM.WipeKeybindCache   = WipeKeybindCache
 
 -- =========================================================================
 --  FONTSTRING MANAGEMENT
@@ -337,10 +420,10 @@ function CDM:ApplyKeybindText(frame, vName)
         return
     end
 
-    -- Look up keybind (spell first, then item fallback)
-    local keybindText = GetKeybindForSpell(spellID)
+    -- Look up keybind via cache (spell first, then item fallback)
+    local keybindText = GetKeybindForSpellCached(spellID)
     if not keybindText and itemID then
-        keybindText = GetKeybindForItem(itemID)
+        keybindText = GetKeybindForItemCached(itemID)
     end
 
     if not keybindText then
@@ -390,10 +473,11 @@ end
 -- =========================================================================
 
 function CDM:RefreshAllKeybindTexts()
-    -- Wipe override cache so spec/talent changes are reflected
+    -- Wipe caches so spec/talent/slot changes are reflected
     if CDM.WipeEffectiveIDCache then
         CDM.WipeEffectiveIDCache()
     end
+    WipeKeybindCache()  -- force rebuild of spell→keybind map on next lookup
     -- Viewer-based frames (Essential, Utility)
     local viewerNames = { VIEWERS.ESSENTIAL, VIEWERS.UTILITY }
     for _, vName in ipairs(viewerNames) do
