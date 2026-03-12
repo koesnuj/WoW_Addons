@@ -1536,11 +1536,18 @@ end)
 local itemInfoFrame = CreateFrame("Frame")
 itemInfoFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 itemInfoFrame:RegisterEvent("ADDON_LOADED")
+local _pendingAuraLocalize = false
 itemInfoFrame:SetScript("OnEvent", function(_, event, arg1)
     if event == "GET_ITEM_INFO_RECEIVED" then
-        EnsureLocalizedAuraBuffReminderState()
-        if NS.InvalidateDynamicGameNameMap then
-            NS.InvalidateDynamicGameNameMap()
+        if not _pendingAuraLocalize then
+            _pendingAuraLocalize = true
+            Delay(function()
+                _pendingAuraLocalize = false
+                EnsureLocalizedAuraBuffReminderState()
+                if NS.InvalidateDynamicGameNameMap then
+                    NS.InvalidateDynamicGameNameMap()
+                end
+            end)
         end
         Delay(LocalizeSettingsFrames)
         Delay(HookUnlockFrame)
