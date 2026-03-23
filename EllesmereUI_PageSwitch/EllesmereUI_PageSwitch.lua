@@ -2,18 +2,57 @@
 --  EllesmereUI_PageSwitch.lua
 --
 --  Adds Shift+MouseWheel page switching to EllesmereUIActionBars MainBar.
---  Shift+WheelUp  = switch to Bar6 slot range (145-156)
---  Shift+WheelDown = switch back to default Bar1 slots (1-12)
+--  Shift+WheelUp/Down = toggle between Bar1 (slots 1-12) and Action Bar 6 / MultiBar5 (slots 145-156)
 --
---  Hooks into EAB's UpdateOffset RunAttribute for combat-safe operation.
---  Survives EllesmereUIActionBars updates — no files modified in that addon.
+--  ElvUI-inspired approach:
+--    - Re-registers EAB's page state driver with [bar:N] BEFORE [bonusbar:5],
+--      so /changeactionbar takes priority over dragonriding (bonusbar:5).
+--    - Adds [bar:12] 12 condition: page 12 → offset 144 → MultiBar5 slots.
+--    - Uses SecureActionButtonTemplate macros for Shift+Wheel bindings.
+--    - Does NOT modify EAB's UpdateOffset — immune to EAB resets.
 -------------------------------------------------------------------------------
 local ADDON_NAME = ...
 
-local BAR6_OFFSET      = 144   -- Bar6 = MultiBar5, slots 145-156
-local NUM_BUTTONS      = 12
-local MAINBAR_FRAME    = "EABBar_MainBar"
-local HANDLER_NAME     = "EUIPageSwitch"
+local MAINBAR_FRAME = "EABBar_MainBar"
+local HANDLER_NAME  = "EUIPageSwitch"
+local PAGE_BAR6     = 2    -- EAB "Action Bar 6" in TWW: NUM_ACTIONBAR_PAGES=2,
+                            -- /changeactionbar 2 maps to Action Bar 6 (MultiBar5)
+
+-------------------------------------------------------------------------------
+--  Build modified paging conditions (ElvUI pattern)
+--  Puts [bar:N] BEFORE [bonusbar:5] so user-set pages beat dragonriding.
+--  Adds [bar:12] 12 for Bar6/MultiBar5 access while flying.
+-------------------------------------------------------------------------------
+local function BuildConditions()
+    local _, class = UnitClass("player")
+    local c = ""
+
+    -- Override/vehicle bar (absolute priority, same as EAB)
+    if GetOverrideBarIndex then
+        c = c .. "[overridebar] " .. GetOverrideBarIndex() .. "; "
+    end
+    if GetVehicleBarIndex then
+        c = c .. "[vehicleui][possessbar] " .. GetVehicleBarIndex() .. "; "
+    end
+
+    -- Class stance/form paging (kept before user pages, same as EAB)
+    if class == "DRUID" then
+        c = c .. "[bonusbar:1,stealth] 7; [bonusbar:1] 7; [bonusbar:3] 9; [bonusbar:4] 10; "
+    elseif class == "ROGUE" then
+        c = c .. "[bonusbar:1] 7; "
+    end
+
+    -- User-set pages (ElvUI: these come BEFORE bonusbar:5 so they work mid-flight)
+    c = c .. "[bar:" .. PAGE_BAR6 .. "] " .. PAGE_BAR6 .. "; "  -- Bar6/MultiBar5
+    for i = 2, NUM_ACTIONBAR_PAGES or 6 do
+        c = c .. "[bar:" .. i .. "] " .. i .. "; "
+    end
+
+    -- Dragonriding/Skyriding — after user-set pages (ElvUI pattern)
+    c = c .. "[bonusbar:5] 11; "
+
+    return c .. "1"
+end
 
 -------------------------------------------------------------------------------
 --  Core Init — called once MainBar frame is confirmed to exist
@@ -21,124 +60,43 @@ local HANDLER_NAME     = "EUIPageSwitch"
 local function Init()
     local mainBar = _G[MAINBAR_FRAME]
     if not mainBar then return end
-
     if not _G["ActionButton1"] then return end
 
     ---------------------------------------------------------------------------
-    --  1. Create a SecureHandlerClickTemplate button
-    --     SetOverrideBindingClick maps Shift+Wheel to virtual clicks on this.
+    --  1. Re-register EAB's page state driver with modified conditions
+    --     Unregister EAB's driver first, then re-register with our conditions.
+    --     EAB's original UpdateOffset handles page 12 → offset 144 correctly.
     ---------------------------------------------------------------------------
-    local handler = CreateFrame("Button", HANDLER_NAME, UIParent,
-                                "SecureHandlerClickTemplate")
-    handler:SetSize(1, 1)
-    handler:SetPoint("CENTER")
-    handler:RegisterForClicks("AnyDown")
-    handler:SetAttribute("shiftPage", 0)
-
-    handler:SetFrameRef("mainbar", mainBar)
+    UnregisterStateDriver(mainBar, "page")
+    RegisterStateDriver(mainBar, "page", BuildConditions())
 
     ---------------------------------------------------------------------------
-    --  2. Secure click handler
-    --     Toggles shiftPage, then re-runs MainBar's UpdateOffset so the
-    --     unified offset pipeline (including ChildUpdate) handles everything.
+    --  2. Two SecureActionButtonTemplate frames for bindings
+    --     WheelUp  → /changeactionbar 12  (Bar6/MultiBar5)
+    --     WheelDown → /changeactionbar 1   (default Bar1)
     ---------------------------------------------------------------------------
-    handler:SetAttribute("_onclick", [[
-        local mainbar = self:GetFrameRef("mainbar")
+    local btn = CreateFrame("Button", HANDLER_NAME, UIParent, "SecureActionButtonTemplate")
+    btn:SetSize(1, 1)
+    btn:SetPoint("CENTER")
+    btn:RegisterForClicks("AnyDown")
+    btn:SetAttribute("type", "macro")
+    -- Toggle: if currently on Bar6 → go to Bar1, otherwise → go to Bar6
+    btn:SetAttribute("macrotext", "/changeactionbar [bar:" .. PAGE_BAR6 .. "] 1; " .. PAGE_BAR6)
 
-        -- Block switching during override/vehicle bar
-        local overridePage = mainbar:GetAttribute("state-overridepage") or 0
-        if overridePage > 0 and mainbar:GetAttribute("state-overridebar") then
-            return
-        end
-
-        -- Block switching when not on default page (stance/form paging)
-        local page = mainbar:GetAttribute("state-page") or 1
-        if page ~= 1 then return end
-
-        local shiftPage = self:GetAttribute("shiftPage") or 0
-        local newShiftPage = shiftPage == 1 and 0 or 1
-        self:SetAttribute("shiftPage", newShiftPage)
-
-        mainbar:RunAttribute("UpdateOffset")
-    ]])
+    SetOverrideBindingClick(btn, true, "SHIFT-MOUSEWHEELUP",   HANDLER_NAME)
+    SetOverrideBindingClick(btn, true, "SHIFT-MOUSEWHEELDOWN", HANDLER_NAME)
 
     ---------------------------------------------------------------------------
-    --  3. Override bindings — Shift+MouseWheel → virtual click on handler
-    --     These persist through combat; cleared only if handler is hidden.
-    ---------------------------------------------------------------------------
-    SetOverrideBindingClick(handler, false,
-        "SHIFT-MOUSEWHEELUP",   HANDLER_NAME, "LeftButton")
-    SetOverrideBindingClick(handler, false,
-        "SHIFT-MOUSEWHEELDOWN", HANDLER_NAME, "RightButton")
-
-    ---------------------------------------------------------------------------
-    --  4. Replace MainBar's UpdateOffset RunAttribute
-    --     Preserves upstream's full offset pipeline (override bar detection,
-    --     vehicle/possess fallback, slot-132 skip), then layers shiftPage
-    --     override on top.  _onstate-page / _onstate-overridebar /
-    --     _onstate-overridepage all still funnel into this single attribute.
-    ---------------------------------------------------------------------------
-    mainBar:SetFrameRef("pageSwitch", handler)
-
-    mainBar:SetAttribute("UpdateOffset", [[
-        local offset = 0
-
-        local overridePage = self:GetAttribute("state-overridepage") or 0
-        if overridePage > 0 and self:GetAttribute("state-overridebar") then
-            offset = (overridePage - 1) * self:GetAttribute("overrideBarLength")
-        else
-            local page = self:GetAttribute("state-page") or 1
-
-            if page == 11 then
-                if HasVehicleActionBar() then
-                    page = GetVehicleBarIndex()
-                elseif HasOverrideActionBar() then
-                    page = GetOverrideBarIndex()
-                elseif HasTempShapeshiftActionBar() then
-                    page = GetTempShapeshiftBarIndex()
-                elseif HasBonusActionBar() then
-                    page = GetBonusBarIndex()
-                end
-            end
-
-            local barLen = self:GetAttribute("barLength")
-            offset = (page - 1) * barLen
-
-            if offset >= 132 then
-                offset = offset + 12
-            end
-        end
-
-        -- PageSwitch: read shift-page state from click handler
-        local ps = self:GetFrameRef("pageSwitch")
-        local shiftPage = ps and ps:GetAttribute("shiftPage") or 0
-
-        -- Auto-reset shift page when a form/vehicle overrides paging
-        if offset > 0 and shiftPage == 1 then
-            if ps then ps:SetAttribute("shiftPage", 0) end
-            shiftPage = 0
-        end
-
-        -- Apply Bar6 override when on default page
-        if shiftPage == 1 and offset == 0 then
-            offset = 144
-        end
-
-        self:SetAttribute("actionOffset", offset)
-        control:ChildUpdate("offset", offset)
-    ]])
-
-    ---------------------------------------------------------------------------
-    --  5. Page indicator (visual feedback below MainBar)
+    --  3. Page indicator — shows "Bar 6" below MainBar when on page 12
     ---------------------------------------------------------------------------
     local indicator = mainBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     indicator:SetPoint("TOP", mainBar, "BOTTOM", 0, -2)
     indicator:SetTextColor(0.8, 0.8, 0.2, 0.9)
     indicator:Hide()
 
-    handler:SetScript("OnAttributeChanged", function(self, name, value)
-        if name == "shiftPage" then
-            if value == 1 then
+    mainBar:HookScript("OnAttributeChanged", function(self, name, value)
+        if name == "state-page" then
+            if tonumber(value) == PAGE_BAR6 then
                 indicator:SetText("Bar 6")
                 indicator:Show()
             else
